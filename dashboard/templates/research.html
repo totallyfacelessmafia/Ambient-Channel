@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% block title %}Channel Research — UltraFocusZone{% endblock %}
+
+{% block content %}
+<div class="research-page">
+
+  <!-- ── Header ── -->
+  <div class="research-header">
+    <div>
+      <h1>Channel Research</h1>
+      <p class="subtitle">Track competitors, spot trending videos, and steal winning title formulas.</p>
+    </div>
+    <div class="research-controls">
+      {% if research %}
+        {% if age_hours < 1 %}
+          <span class="research-age">Updated just now</span>
+        {% elif age_hours < 24 %}
+          <span class="research-age">Updated {{ age_hours | int }}h ago</span>
+        {% else %}
+          <span class="research-age research-age-stale">Updated {{ (age_hours / 24) | int }}d ago</span>
+        {% endif %}
+      {% endif %}
+      <button class="btn btn-primary" id="refresh-btn">
+        <span id="refresh-label">Refresh Data</span>
+      </button>
+    </div>
+  </div>
+  <div id="refresh-status" class="refresh-status hidden"></div>
+
+  {% if not research %}
+  <!-- ── Empty state ── -->
+  <div class="research-empty">
+    <div class="research-empty-icon">&#128202;</div>
+    <h2>No data yet</h2>
+    <p>Click <strong>Refresh Data</strong> to fetch recent videos from your channel and all reference channels.<br>
+       Requires a YouTube API key in <code>config.json</code>.</p>
+    {% if not channel.channel_id %}
+    <p class="research-empty-warn">Your channel ID isn't set. Visit <a href="{{ url_for('onboarding') }}">Channel Setup</a> and fetch your channel first.</p>
+    {% endif %}
+  </div>
+
+  {% else %}
+
+  <!-- ── Trending Now ── -->
+  {% if research.all_outliers %}
+  <div class="research-section trending-section">
+    <div class="section-header">
+      <div>
+        <h2>&#128293; Trending Now</h2>
+        <p class="section-subtitle">Videos performing 3× above their channel's average — steal their format.</p>
+      </div>
+    </div>
+    <div class="trending-grid">
+      {% for v in research.all_outliers[:8] %}
+      <a class="trending-card" href="https://www.youtube.com/watch?v={{ v.video_id }}" target="_blank" rel="noopener">
+        <div class="trending-thumb-wrap">
+          <img src="{{ v.thumbnail_url }}" alt="" loading="lazy">
+          <span class="view-badge view-badge-hot">{{ v.view_count | format_views }}</span>
+        </div>
+        <div class="trending-info">
+          <div class="trending-title">{{ v.title | truncate(65, True) }}</div>
+          <div class="trending-channel">{{ v.channel_name }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── Per-channel sections ── -->
+  {% for ch in research.channels %}
+  <div class="research-section">
+    <div class="section-header">
+      <div>
+        <h2>
+          {{ ch.name }}
+          {% if ch.is_own %}<span class="badge-own">Your Channel</span>{% endif %}
+        </h2>
+        <p class="section-subtitle">
+          Median {{ ch.median_views | format_views }} views
+          &middot; {{ ch.videos | length }} recent videos
+          {% if ch.error %}&middot; <span class="text-danger">{{ ch.error }}</span>{% endif %}
+        </p>
+      </div>
+    </div>
+
+    {% if ch.videos %}
+    <div class="research-thumb-grid">
+      {% for v in ch.videos %}
+      <a class="research-thumb-card{% if v.video_id in ch.outliers %} is-outlier{% endif %}"
+         href="https://www.youtube.com/watch?v={{ v.video_id }}" target="_blank" rel="noopener">
+        <div class="research-thumb-wrap">
+          <img src="{{ v.thumbnail_url }}" alt="" loading="lazy">
+          <span class="view-badge{% if v.video_id in ch.outliers %} view-badge-hot{% endif %}">
+            {{ v.view_count | format_views }}
+          </span>
+          {% if v.video_id in ch.outliers %}
+          <span class="outlier-flame">&#128293;</span>
+          {% endif %}
+        </div>
+        <div class="research-thumb-title">{{ v.title | truncate(52, True) }}</div>
+      </a>
+      {% endfor %}
+    </div>
+    {% elif ch.error %}
+    <p class="text-danger" style="margin-top:8px">Could not fetch videos: {{ ch.error }}</p>
+    {% else %}
+    <p class="muted" style="margin-top:8px">No videos found.</p>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <!-- ── Title Intelligence ── -->
+  <div class="research-section">
+    <div class="section-header">
+      <div>
+        <h2>Title Intelligence</h2>
+        <p class="section-subtitle">Patterns extracted from {{ research.title_analysis.total_videos }} videos across all channels.</p>
+      </div>
+    </div>
+    <div class="title-intel-grid">
+
+      <div class="intel-card">
+        <h3>Top Keywords</h3>
+        <div class="keyword-cloud">
+          {% for kw in research.title_analysis.top_keywords %}
+          <span class="keyword-tag">{{ kw }}</span>
+          {% endfor %}
+          {% if not research.title_analysis.top_keywords %}
+          <span class="muted">Not enough data yet.</span>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="intel-card">
+        <h3>Common Phrases</h3>
+        {% if research.title_analysis.top_phrases %}
+        <ul class="phrase-list">
+          {% for phrase in research.title_analysis.top_phrases %}
+          <li>{{ phrase }}</li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted">Not enough data yet.</p>
+        {% endif %}
+      </div>
+
+      <div class="intel-card">
+        <h3>Title Templates</h3>
+        <p class="intel-hint">Copy-ready patterns from top-performing titles:</p>
+        {% if research.title_analysis.templates %}
+        <ul class="template-list">
+          {% for tmpl in research.title_analysis.templates %}
+          <li class="template-item">
+            <span class="template-text">{{ tmpl }}</span>
+            <button class="btn-copy" data-copy="{{ tmpl }}" title="Copy to clipboard">Copy</button>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="muted">Not enough data yet — refresh to analyze more titles.</p>
+        {% endif %}
+      </div>
+
+    </div>
+  </div>
+
+  {% endif %}{# end if research #}
+
+  <!-- ── Browse Any Channel ── -->
+  <div class="research-section">
+    <div class="section-header">
+      <div>
+        <h2>Browse Any Channel</h2>
+        <p class="section-subtitle">Preview a channel's recent videos without saving it to your profile.</p>
+      </div>
+    </div>
+    <div class="input-action-row" style="max-width:560px">
+      <input type="text" id="browse-url" placeholder="https://youtube.com/@ChannelName">
+      <button class="btn btn-ghost" id="browse-btn">Browse</button>
+    </div>
+    <small id="browse-status" class="yt-fetch-status"></small>
+    <div id="browse-results"></div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Refresh ────────────────────────────────────────────────────────────────
+document.getElementById('refresh-btn').addEventListener('click', function() {
+  var btn   = this;
+  var label = document.getElementById('refresh-label');
+  var stat  = document.getElementById('refresh-status');
+  btn.disabled = true;
+  label.textContent = 'Refreshing…';
+  stat.textContent  = 'Fetching videos from YouTube API (this may take 10–20 seconds)…';
+  stat.classList.remove('hidden', 'refresh-error');
+
+  fetch('/research/refresh', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        stat.textContent = 'Done! Reloading…';
+        setTimeout(function() { location.reload(); }, 800);
+      } else {
+        stat.textContent = 'Error: ' + data.error;
+        stat.classList.add('refresh-error');
+        btn.disabled = false;
+        label.textContent = 'Refresh Data';
+      }
+    })
+    .catch(function() {
+      stat.textContent = 'Request failed. Check your internet connection.';
+      stat.classList.add('refresh-error');
+      btn.disabled = false;
+      label.textContent = 'Refresh Data';
+    });
+});
+
+// ── Copy template ──────────────────────────────────────────────────────────
+document.querySelectorAll('.btn-copy').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var text = btn.dataset.copy;
+    navigator.clipboard.writeText(text).then(function() {
+      var orig = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(function() { btn.textContent = orig; }, 1500);
+    });
+  });
+});
+
+// ── Browse any channel ─────────────────────────────────────────────────────
+document.getElementById('browse-btn').addEventListener('click', function() {
+  var url  = document.getElementById('browse-url').value.trim();
+  var stat = document.getElementById('browse-status');
+  var res  = document.getElementById('browse-results');
+  if (!url) { stat.textContent = 'Please enter a channel URL.'; return; }
+
+  stat.textContent = 'Fetching…';
+  res.innerHTML    = '';
+  var fd = new FormData();
+  fd.append('channel_url', url);
+
+  fetch('/research/add-channel', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) { stat.textContent = 'Error: ' + data.error; return; }
+      stat.textContent = 'Showing ' + data.videos.length + ' recent videos from ' + data.name;
+      renderBrowseResults(data);
+    })
+    .catch(function() { stat.textContent = 'Request failed.'; });
+});
+
+function fmtViews(n) {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+  return String(n);
+}
+
+function renderBrowseResults(data) {
+  var res = document.getElementById('browse-results');
+  var cards = (data.videos || []).map(function(v) {
+    return '<a class="research-thumb-card" href="https://www.youtube.com/watch?v=' + v.video_id
+      + '" target="_blank" rel="noopener">'
+      + '<div class="research-thumb-wrap">'
+      + '<img src="' + v.thumbnail_url + '" alt="" loading="lazy">'
+      + '<span class="view-badge">' + fmtViews(v.view_count) + '</span>'
+      + '</div>'
+      + '<div class="research-thumb-title">' + (v.title || '').substring(0, 52) + '</div>'
+      + '</a>';
+  }).join('');
+
+  res.innerHTML = '<div class="browse-section-header"><strong>' + data.name + '</strong></div>'
+    + '<div class="research-thumb-grid">' + cards + '</div>';
+}
+</script>
+{% endblock %}

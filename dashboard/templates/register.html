@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Account — ChannelForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='home.css') }}">
+</head>
+<body class="home-body">
+  <nav class="home-nav">
+    <a class="home-nav-brand" href="/">&#9889; ChannelForge</a>
+    <div class="home-nav-right">
+      <a href="{{ url_for('login_page') }}" class="btn btn-ghost btn-sm">Sign In</a>
+    </div>
+  </nav>
+
+  <div class="auth-page">
+    <div class="auth-card">
+      <h1 class="auth-title">Create your account</h1>
+      <p class="auth-subtitle">Start building your YouTube channel in minutes.</p>
+
+      {% if error %}
+      <div class="auth-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('register_page') }}" class="auth-form" id="register-form">
+        <div class="auth-field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required autofocus
+                 autocomplete="email" placeholder="you@example.com"
+                 value="{{ email or '' }}">
+        </div>
+        <div class="auth-field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required
+                 autocomplete="new-password" placeholder="Minimum 6 characters" minlength="6">
+        </div>
+        <div class="auth-field">
+          <label for="password2">Confirm Password</label>
+          <input type="password" id="password2" name="password2" required
+                 autocomplete="new-password" placeholder="Re-enter your password" minlength="6">
+        </div>
+        <div class="auth-terms">
+          <label>
+            <input type="checkbox" id="agree" name="agree" required>
+            I agree to the <a href="{{ url_for('terms_page') }}" target="_blank">Terms of Service</a>
+            and <a href="{{ url_for('privacy_page') }}" target="_blank">Privacy Policy</a>.
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary auth-btn">Create Account</button>
+      </form>
+
+      <p class="auth-alt">Already have an account? <a href="{{ url_for('login_page') }}">Sign in</a></p>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('register-form').addEventListener('submit', function(e) {
+      var pw1 = document.getElementById('password').value;
+      var pw2 = document.getElementById('password2').value;
+      if (pw1 !== pw2) {
+        e.preventDefault();
+        alert('Passwords do not match.');
+      }
+    });
+  </script>
+</body>
+</html>

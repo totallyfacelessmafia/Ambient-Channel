@@ -1,0 +1,26 @@
+{
+  "theme": "Cozy Rainy Cabin - 1 Hour Deep Work Focus Music",
+  "generate_music": true,
+  "music_style": "ambient lofi rain piano",
+  "upload_youtube": false,
+  "video_duration_minutes": 60,
+  "track_count": 18,
+
+  "suno": {
+    "enabled": false
+  },
+
+  "fal": {
+    "api_key": ""
+  },
+
+  "youtube": {
+    "api_key": "",
+    "channel_id": ""
+  },
+
+  "youtube_oauth": {
+    "client_id":     "",
+    "client_secret": ""
+  }
+}

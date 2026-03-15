@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChannelForge — AI YouTube Channel Automation</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='home.css') }}">
+</head>
+<body class="home-body">
+
+  <!-- ── Nav ── -->
+  <nav class="home-nav">
+    <a class="home-nav-brand" href="/">&#9889; ChannelForge</a>
+    <div class="home-nav-right">
+      <a href="{{ url_for('login_page') }}" class="btn btn-ghost btn-sm">Sign In</a>
+      <a href="{{ url_for('register_page') }}" class="btn btn-primary btn-sm">Get Started Free</a>
+    </div>
+  </nav>
+
+  <!-- ── Hero ── -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-badge">AI-Powered YouTube Automation</div>
+      <h1 class="hero-headline">
+        Turn a prompt into a<br>
+        <span class="hero-gradient">publish-ready YouTube video</span><br>
+        in under an hour.
+      </h1>
+      <p class="hero-sub">
+        ChannelForge automates the entire pipeline for ambient &amp; focus music channels —
+        AI visuals, animated loops, royalty-free music, SEO, and YouTube upload.
+        No editing software. No subscriptions to juggle.
+      </p>
+      <div class="hero-cta">
+        <a href="{{ url_for('register_page') }}" class="btn btn-primary btn-lg">Start Building Your Channel</a>
+        <a href="#how-it-works" class="btn btn-ghost btn-lg">See How It Works</a>
+      </div>
+      <p class="hero-note">No credit card required &bull; Free tier available</p>
+    </div>
+
+    <!-- Floating thumbnail mockups -->
+    <div class="hero-thumbs">
+      <div class="hero-thumb hero-thumb-1">
+        <div class="hero-thumb-img" style="background: linear-gradient(135deg, #0a1628, #1a2a4a)">
+          <div class="hero-thumb-overlay">
+            <span class="hero-thumb-title">Deep Focus — Flow State</span>
+            <span class="hero-thumb-meta">1 Hour &bull; 84K views</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero-thumb hero-thumb-2">
+        <div class="hero-thumb-img" style="background: linear-gradient(135deg, #0d1a0d, #1a3a1a)">
+          <div class="hero-thumb-overlay">
+            <span class="hero-thumb-title">Zero Distractions</span>
+            <span class="hero-thumb-meta">1 Hour &bull; 121K views</span>
+          </div>
+        </div>
+      </div>
+      <div class="hero-thumb hero-thumb-3">
+        <div class="hero-thumb-img" style="background: linear-gradient(135deg, #1a0a28, #2a1048)">
+          <div class="hero-thumb-overlay">
+            <span class="hero-thumb-title">Cognitive Horizon</span>
+            <span class="hero-thumb-meta">1 Hour &bull; 56K views</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Social proof strip ── -->
+  <div class="proof-strip">
+    <div class="proof-inner">
+      <div class="proof-stat"><span class="proof-num">5-step</span><span class="proof-label">automated pipeline</span></div>
+      <div class="proof-divider"></div>
+      <div class="proof-stat"><span class="proof-num">&lt;1hr</span><span class="proof-label">idea to upload</span></div>
+      <div class="proof-divider"></div>
+      <div class="proof-stat"><span class="proof-num">100%</span><span class="proof-label">royalty-free output</span></div>
+      <div class="proof-divider"></div>
+      <div class="proof-stat"><span class="proof-num">Multi</span><span class="proof-label">channel support</span></div>
+    </div>
+  </div>
+
+  <!-- ── How it works ── -->
+  <section class="section" id="how-it-works">
+    <div class="section-inner">
+      <div class="section-label">THE PIPELINE</div>
+      <h2 class="section-title">Five steps. Fully automated.</h2>
+      <p class="section-sub">Every video goes through the same production pipeline, powered by AI at each stage.</p>
+
+      <div class="steps-grid">
+        <div class="step-card">
+          <div class="step-num">01</div>
+          <div class="step-icon">&#127775;</div>
+          <h3>AI Scene Generation</h3>
+          <p>Enter a concept. FLUX Pro generates 4 cinematic candidate scenes. Pick your favorite — or let the channel style guide the AI automatically.</p>
+          <div class="step-tag">fal.ai FLUX Pro</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">02</div>
+          <div class="step-icon">&#127916;</div>
+          <h3>Animated Loop</h3>
+          <p>Your scene becomes a seamless looping video — either a smooth Ken Burns pan or a fully AI-animated Kling clip with real motion.</p>
+          <div class="step-tag">Ken Burns / Kling AI</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">03</div>
+          <div class="step-icon">&#127925;</div>
+          <h3>Music Generation</h3>
+          <p>18 original ambient tracks generated to match your channel's style. Crossfaded into a 1-hour seamless audio session. Fully royalty-free.</p>
+          <div class="step-tag">Stable Audio (fal.ai)</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">04</div>
+          <div class="step-icon">&#128269;</div>
+          <h3>SEO &amp; Thumbnail</h3>
+          <p>Title, description, tags, and a click-optimized thumbnail — all generated to match your channel's niche and proven title patterns.</p>
+          <div class="step-tag">Claude AI</div>
+        </div>
+        <div class="step-card">
+          <div class="step-num">05</div>
+          <div class="step-icon">&#128640;</div>
+          <h3>YouTube Upload</h3>
+          <p>Schedule and publish directly to YouTube with one click. Set publish dates weeks in advance from the built-in content calendar.</p>
+          <div class="step-tag">YouTube Data API</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Features ── -->
+  <section class="section section-alt">
+    <div class="section-inner">
+      <div class="section-label">BUILT-IN TOOLS</div>
+      <h2 class="section-title">Everything a serious creator needs.</h2>
+
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">&#128197;</div>
+          <h3>Content Calendar</h3>
+          <p>Visual monthly calendar. Schedule videos weeks ahead. Batch-create publishing slots in one click.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128202;</div>
+          <h3>Channel Research</h3>
+          <p>Track competitor channels. Spot trending videos and outliers performing 3× above average. Get title templates.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#127748;</div>
+          <h3>Image Library</h3>
+          <p>Generate and manage a library of cinematic scenes. Reuse assets across videos to save API credits.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#9881;</div>
+          <h3>Multi-Channel</h3>
+          <p>Manage multiple YouTube channels from one dashboard. Each channel keeps its own style, projects, and schedule.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#128161;</div>
+          <h3>Style Profiles</h3>
+          <p>Define your channel's visual DNA once — vibe, color palette, scene style. Every video matches your brand automatically.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">&#127381;</div>
+          <h3>Real-Time Progress</h3>
+          <p>Watch each step complete in real time. Log output, progress bars, and error recovery — no black boxes.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ── -->
+  <section class="section cta-section">
+    <div class="section-inner cta-inner">
+      <h2 class="cta-title">Ready to automate your channel?</h2>
+      <p class="cta-sub">Join creators who are publishing consistent, high-quality ambient videos without the manual grind.</p>
+      <a href="{{ url_for('register_page') }}" class="btn btn-primary btn-lg">Get Started Free</a>
+    </div>
+  </section>
+
+  <!-- ── Footer ── -->
+  <footer class="home-footer">
+    <div class="footer-inner">
+      <span class="footer-brand">&#9889; ChannelForge</span>
+      <span class="footer-links">
+        <a href="{{ url_for('terms_page') }}">Terms</a>
+        <a href="{{ url_for('privacy_page') }}">Privacy</a>
+      </span>
+      <span class="footer-copy">&copy; 2026 ChannelForge. Built for YouTube creators.</span>
+    </div>
+  </footer>
+
+  <script>
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(function(a) {
+      a.addEventListener('click', function(e) {
+        var target = document.querySelector(a.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UltraFocusZone &mdash; Image Library</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=4">
+  <style>
+    .lib-main { padding: 28px 32px; max-width: 1300px; }
+
+    /* Generate bar */
+    .lib-generate-bar {
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px 20px; margin-bottom: 28px;
+    }
+    .lib-generate-bar input[type="text"] {
+      flex: 1; min-width: 240px;
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); padding: 9px 14px; font-size: 14px;
+    }
+    .lib-generate-bar input[type="text"]::placeholder { color: var(--muted); }
+    .lib-count-label { color: var(--muted); font-size: 13px; white-space: nowrap; }
+    .lib-count-select {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); padding: 9px 10px; font-size: 14px;
+    }
+
+    /* Spinner */
+    .lib-spinner {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 18px 20px; margin-bottom: 24px;
+      color: var(--accent2);
+    }
+    .spinner-ring {
+      width: 22px; height: 22px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin .8s linear infinite; flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Error banner */
+    .lib-error {
+      background: rgba(239,68,68,.12); border: 1px solid var(--danger);
+      border-radius: var(--radius); padding: 14px 18px; margin-bottom: 20px;
+      color: var(--danger); font-size: 14px;
+    }
+
+    /* Empty state */
+    .lib-empty {
+      text-align: center; padding: 64px 24px; color: var(--muted);
+    }
+    .lib-empty p { margin-top: 8px; font-size: 14px; }
+
+    /* Batch */
+    .lib-batch { margin-bottom: 36px; }
+    .lib-batch-header {
+      display: flex; align-items: baseline; gap: 12px; margin-bottom: 12px;
+    }
+    .lib-batch-prompt {
+      font-size: 13px; color: var(--muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 640px;
+    }
+    .lib-batch-date { font-size: 12px; color: var(--border); flex-shrink: 0; }
+
+    /* Image grid */
+    .lib-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .lib-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      display: flex; flex-direction: column;
+      transition: border-color .2s;
+    }
+    .lib-card:hover { border-color: var(--accent2); }
+    .lib-card img {
+      width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block;
+    }
+    .lib-card-actions {
+      display: flex; gap: 8px; padding: 10px 12px;
+    }
+    .lib-card-actions .btn { flex: 1; justify-content: center; font-size: 13px; padding: 7px 10px; }
+    .lib-card img { cursor: zoom-in; }
+
+    /* Used-in-projects section */
+    .lib-used-section { margin-top: 48px; border-top: 1px solid var(--border); padding-top: 24px; }
+    .lib-used-toggle {
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+      background: none; border: none; color: var(--muted); font-size: 13px;
+      padding: 0; width: 100%; text-align: left;
+    }
+    .lib-used-toggle:hover { color: var(--text); }
+    .lib-used-toggle .lib-used-chevron { font-size: 11px; transition: transform .2s; }
+    .lib-used-toggle.open .lib-used-chevron { transform: rotate(90deg); }
+    .lib-used-body { margin-top: 16px; }
+    .lib-used-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+      display: flex; flex-direction: column; opacity: .65;
+    }
+    .lib-used-card img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; cursor: zoom-in; }
+    .lib-used-card-actions { display: flex; gap: 8px; padding: 8px 12px; }
+    .lib-used-card-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 6px 8px; }
+
+    /* Lightbox */
+    #lib-lightbox {
+      position: fixed; inset: 0; z-index: 9000;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #lib-lb-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,.88); backdrop-filter: blur(6px);
+    }
+    #lib-lb-img {
+      position: relative; z-index: 1;
+      max-width: 90vw; max-height: 85vh;
+      object-fit: contain; border-radius: 8px;
+      box-shadow: 0 8px 48px rgba(0,0,0,.7);
+      user-select: none;
+    }
+    .lib-lb-btn {
+      position: absolute; z-index: 2;
+      background: rgba(255,255,255,.12); border: none;
+      color: #fff; font-size: 28px; cursor: pointer;
+      width: 52px; height: 52px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .15s;
+    }
+    .lib-lb-btn:hover { background: rgba(255,255,255,.25); }
+    #lib-lb-close { top: 20px; right: 24px; font-size: 22px; }
+    #lib-lb-prev  { left: 20px; }
+    #lib-lb-next  { right: 20px; }
+    #lib-lb-counter {
+      position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+      z-index: 2; color: rgba(255,255,255,.6); font-size: 13px;
+      background: rgba(0,0,0,.4); padding: 4px 12px; border-radius: 20px;
+    }
+  </style>
+</head>
+<body class="dashboard-body">
+
+<header class="dash-header">
+  <a class="dash-brand" href="/">&#9889; UltraFocusZone</a>
+  <div class="dash-header-right">
+    <span class="nav-user">{{ session.user }}</span>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('onboarding') }}">Channel Setup</a>
+    <form method="POST" action="{{ url_for('logout') }}" style="display:inline">
+      <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
+    </form>
+  </div>
+</header>
+
+<div class="dash-layout" id="dash-layout">
+
+  <nav class="dash-nav">
+    <div class="dash-nav-links">
+      <a class="dash-nav-link" href="/">&#8862; Dashboard</a>
+      <a class="dash-nav-link active" href="{{ url_for('image_library_page') }}">&#128444; Image Library</a>
+      <a class="dash-nav-link" href="{{ url_for('onboarding') }}">&#9881; Channel Setup</a>
+    </div>
+  </nav>
+
+  <div class="dash-main lib-main" id="lib-main">
+
+    <h2 style="margin-bottom:20px; font-size:20px;">Image Library</h2>
+
+    <!-- ── Generate bar ─────────────────────────────────────────────────── -->
+    <div class="lib-generate-bar">
+      <input type="text" id="lib-prompt" placeholder="Scene prompt (leave blank for channel style)">
+      <span class="lib-count-label">Images:</span>
+      <select id="lib-count" class="lib-count-select">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4" selected>4</option>
+      </select>
+      <button class="btn btn-primary" id="lib-gen-btn" onclick="libGenerate()">&#10024; Generate</button>
+    </div>
+
+    <!-- ── Spinner (shown while generating) ─────────────────────────────── -->
+    <div class="lib-spinner" id="lib-spinner" {% if not generating %}style="display:none"{% endif %}>
+      <div class="spinner-ring"></div>
+      <span>Generating images via fal.ai FLUX Pro&hellip; (<span id="lib-elapsed">0s</span>)</span>
+    </div>
+
+    <!-- ── Error banner ──────────────────────────────────────────────────── -->
+    {% if generate_error %}
+    <div class="lib-error" id="lib-error-banner">
+      Generation failed: {{ generate_error }}
+    </div>
+    {% else %}
+    <div class="lib-error" id="lib-error-banner" style="display:none"></div>
+    {% endif %}
+
+    <!-- ── Image batches ─────────────────────────────────────────────────── -->
+    <div id="lib-batches">
+      {% if not batches and not generating %}
+      <div class="lib-empty" id="lib-empty">
+        <div style="font-size:48px">&#128444;</div>
+        <p>No images yet. Enter a prompt above and click Generate.</p>
+      </div>
+      {% else %}
+        {% for batch in batches %}
+        <div class="lib-batch" id="batch-{{ batch.id }}">
+          <div class="lib-batch-header">
+            <span class="lib-batch-prompt" title="{{ batch.prompt }}">{{ batch.prompt }}</span>
+            <span class="lib-batch-date">{{ batch.created_at[:10] }}</span>
+          </div>
+          <div class="lib-grid">
+            {% for img in batch.images %}
+            <div class="lib-card" id="card-{{ img | replace('.', '-') | replace('_', '-') }}">
+              <img src="{{ url_for('serve_file', fp=img) }}" alt="Generated image" loading="lazy">
+              <div class="lib-card-actions">
+                <button class="btn btn-primary" data-img="{{ img }}" data-action="start">&#9654; Start Project</button>
+                <button class="btn btn-danger" data-img="{{ img }}" data-action="delete">&#128465;</button>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- ── Used in Projects ────────────────────────────────────────────────── -->
+    {% if used_images %}
+    <div class="lib-used-section" id="lib-used-section">
+      <button class="lib-used-toggle" id="lib-used-toggle" onclick="libToggleUsed()">
+        <span class="lib-used-chevron">&#9658;</span>
+        Used in Projects &mdash; <span id="lib-used-count">{{ used_images | length }}</span> image<span id="lib-used-plural">{{ '' if used_images | length == 1 else 's' }}</span>
+      </button>
+      <div class="lib-used-body" id="lib-used-body" style="display:none">
+        <div class="lib-grid" id="lib-used-grid">
+          {% for img in used_images %}
+          <div class="lib-used-card" id="used-card-{{ img | replace('.', '-') | replace('_', '-') }}">
+            <img src="{{ url_for('serve_file', fp=img) }}" alt="Used image" loading="lazy" data-img="{{ img }}">
+            <div class="lib-used-card-actions">
+              <span style="flex:1; font-size:12px; color:var(--muted); align-self:center; padding-left:4px;">&#10003; In project</span>
+              <button class="btn btn-danger" data-img="{{ img }}" data-action="delete-used" style="flex:none; padding:6px 12px;">&#128465;</button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div><!-- dash-main -->
+</div><!-- dash-layout -->
+
+<!-- Lightbox -->
+<div id="lib-lightbox" style="display:none">
+  <div id="lib-lb-overlay"></div>
+  <button class="lib-lb-btn" id="lib-lb-close">&#10005;</button>
+  <button class="lib-lb-btn" id="lib-lb-prev">&#10094;</button>
+  <img id="lib-lb-img" src="" alt="Preview">
+  <button class="lib-lb-btn" id="lib-lb-next">&#10095;</button>
+  <div id="lib-lb-counter"></div>
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script>
+var _libPollTimer = null;
+var _knownBatchIds = new Set({{ batches | map(attribute='id') | list | tojson }});
+var _libElapsedTimer = null;
+
+function libStartPolling() {
+  if (_libPollTimer) return;
+  _libPollTimer = setInterval(libPoll, 3000);
+}
+
+function libStopPolling() {
+  clearInterval(_libPollTimer);
+  _libPollTimer = null;
+}
+
+function libPoll() {
+  fetch('/api/images/status')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      document.getElementById('lib-spinner').style.display = d.generating ? '' : 'none';
+      var errBanner = document.getElementById('lib-error-banner');
+      if (d.generate_error) {
+        errBanner.textContent = 'Generation failed: ' + d.generate_error;
+        errBanner.style.display = '';
+      } else {
+        errBanner.style.display = 'none';
+      }
+      if (!d.generating) {
+        libStopPolling();
+        clearInterval(_libElapsedTimer);
+        var genBtn = document.getElementById('lib-gen-btn');
+        genBtn.disabled = false;
+        genBtn.innerHTML = '&#10024; Generate';
+        var container = document.getElementById('lib-batches');
+        var empty = document.getElementById('lib-empty');
+        for (var i = 0; i < d.batches.length; i++) {
+          var batch = d.batches[i];
+          if (_knownBatchIds.has(batch.id)) continue;
+          _knownBatchIds.add(batch.id);
+          if (empty) empty.style.display = 'none';
+          container.insertAdjacentHTML('afterbegin', buildBatchHTML(batch));
+        }
+      }
+    })
+    .catch(function() {});
+}
+
+function buildBatchHTML(batch) {
+  var cards = batch.images.map(function(img) {
+    var safeid = img.replace(/[._]/g, '-');
+    return '<div class="lib-card" id="card-' + safeid + '">'
+      + '<img src="/files/' + img + '" alt="Generated image" loading="lazy">'
+      + '<div class="lib-card-actions">'
+      + '<button class="btn btn-primary" data-img="' + img + '" data-action="start">&#9654; Start Project</button>'
+      + '<button class="btn btn-danger" data-img="' + img + '" data-action="delete">&#128465;</button>'
+      + '</div></div>';
+  }).join('');
+  return '<div class="lib-batch" id="batch-' + batch.id + '">'
+    + '<div class="lib-batch-header">'
+    + '<span class="lib-batch-prompt">' + batch.prompt + '</span>'
+    + '<span class="lib-batch-date">' + batch.created_at.slice(0,10) + '</span>'
+    + '</div><div class="lib-grid">' + cards + '</div></div>';
+}
+
+function libGenerate() {
+  var prompt = document.getElementById('lib-prompt').value.trim();
+  var count  = parseInt(document.getElementById('lib-count').value, 10) || 4;
+  var btn    = document.getElementById('lib-gen-btn');
+  var spinner = document.getElementById('lib-spinner');
+  var errBanner = document.getElementById('lib-error-banner');
+  var timerEl = document.getElementById('lib-elapsed');
+
+  btn.disabled = true;
+  btn.textContent = 'Generating ' + count + ' image' + (count > 1 ? 's' : '') + '...';
+  spinner.style.display = '';
+  errBanner.style.display = 'none';
+
+  var elapsed = 0;
+  if (timerEl) timerEl.textContent = '0s';
+  _libElapsedTimer = setInterval(function() {
+    elapsed++;
+    if (timerEl) timerEl.textContent = elapsed + 's';
+  }, 1000);
+
+  var fd = new FormData();
+  fd.append('prompt', prompt);
+  fd.append('count', count);
+
+  fetch('/images/generate', { method: 'POST', body: fd })
+    .then(function(r) {
+      if (!r.ok) {
+        return r.text().then(function(t) {
+          throw new Error('Server error ' + r.status + ': ' + t.slice(0, 200));
+        });
+      }
+      return r.json();
+    })
+    .then(function(d) {
+      if (!d.ok) throw new Error(d.error || 'Unknown error');
+      libStartPolling();
+    })
+    .catch(function(e) {
+      clearInterval(_libElapsedTimer);
+      spinner.style.display = 'none';
+      btn.disabled = false;
+      btn.innerHTML = '&#10024; Generate';
+      errBanner.textContent = 'Error: ' + e.message;
+      errBanner.style.display = '';
+    });
+}
+
+function libStartProject(filename, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Creating...';
+  var fd = new FormData();
+  fd.append('filename', filename);
+  fetch('/images/start-project', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) {
+        btn.disabled = false;
+        btn.innerHTML = '&#9654; Start Project';
+        alert(d.error || 'Failed to create project.');
+        return;
+      }
+      // Redirect to the new project page
+      window.location.href = d.redirect;
+    });
+}
+
+function libAddUsedCard(filename, projectUrl) {
+  // Ensure the Used section exists; create it if not
+  var section = document.getElementById('lib-used-section');
+  if (!section) {
+    var main = document.getElementById('lib-batches');
+    section = document.createElement('div');
+    section.className = 'lib-used-section';
+    section.id = 'lib-used-section';
+    section.innerHTML =
+      '<button class="lib-used-toggle open" id="lib-used-toggle" onclick="libToggleUsed()">'
+      + '<span class="lib-used-chevron">&#9658;</span>'
+      + ' Used in Projects &mdash; <span id="lib-used-count">0</span> image<span id="lib-used-plural">s</span>'
+      + '</button>'
+      + '<div class="lib-used-body" id="lib-used-body"><div class="lib-grid" id="lib-used-grid"></div></div>';
+    main.parentNode.insertBefore(section, main.nextSibling);
+  }
+
+  // Show the body (auto-expand on first use)
+  var body = document.getElementById('lib-used-body');
+  var toggle = document.getElementById('lib-used-toggle');
+  if (body) body.style.display = '';
+  if (toggle) toggle.classList.add('open');
+
+  // Insert the used card
+  var grid = document.getElementById('lib-used-grid');
+  if (!grid) return;
+  var usedId = 'used-card-' + filename.replace(/[._]/g, '-');
+  var html = '<div class="lib-used-card" id="' + usedId + '">'
+    + '<img src="/files/' + filename + '" alt="Used image" loading="lazy" data-img="' + filename + '">'
+    + '<div class="lib-used-card-actions">'
+    + '<a href="' + projectUrl + '" class="btn btn-ghost btn-sm" style="flex:1;text-align:center;font-size:12px">Open Project</a>'
+    + '<button class="btn btn-danger" data-img="' + filename + '" data-action="delete-used" style="flex:none;padding:6px 12px;">&#128465;</button>'
+    + '</div></div>';
+  grid.insertAdjacentHTML('afterbegin', html);
+
+  // Update the count
+  var countEl = document.getElementById('lib-used-count');
+  var pluralEl = document.getElementById('lib-used-plural');
+  if (countEl) {
+    var n = parseInt(countEl.textContent, 10) + 1;
+    countEl.textContent = n;
+    if (pluralEl) pluralEl.textContent = n === 1 ? '' : 's';
+  }
+}
+
+function libDelete(filename, btn) {
+  if (!confirm('Delete this image from the library?')) return;
+  btn.disabled = true;
+  var fd = new FormData();
+  fd.append('filename', filename);
+  fetch('/images/delete', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { btn.disabled = false; alert(d.error || 'Delete failed.'); return; }
+      var cardId = 'card-' + filename.replace(/[._]/g, '-');
+      var card = document.getElementById(cardId);
+      if (card) card.remove();
+    });
+}
+
+// ---- Lightbox ---------------------------------------------------------------
+var _lbIndex = 0;
+
+function _lbImages() {
+  return Array.from(document.querySelectorAll('#lib-batches .lib-card img'));
+}
+
+function lbOpen(imgEl) {
+  var imgs = _lbImages();
+  _lbIndex = imgs.indexOf(imgEl);
+  if (_lbIndex < 0) _lbIndex = 0;
+  lbShow();
+  document.getElementById('lib-lightbox').style.display = 'flex';
+}
+
+function lbShow() {
+  var imgs = _lbImages();
+  if (!imgs.length) return;
+  var src = imgs[_lbIndex].src;
+  document.getElementById('lib-lb-img').src = src;
+  document.getElementById('lib-lb-counter').textContent = (_lbIndex + 1) + ' / ' + imgs.length;
+  document.getElementById('lib-lb-prev').style.display = imgs.length < 2 ? 'none' : '';
+  document.getElementById('lib-lb-next').style.display = imgs.length < 2 ? 'none' : '';
+}
+
+function lbClose() {
+  document.getElementById('lib-lightbox').style.display = 'none';
+}
+
+function lbPrev() {
+  var imgs = _lbImages();
+  _lbIndex = (_lbIndex - 1 + imgs.length) % imgs.length;
+  lbShow();
+}
+
+function lbNext() {
+  var imgs = _lbImages();
+  _lbIndex = (_lbIndex + 1) % imgs.length;
+  lbShow();
+}
+
+document.getElementById('lib-lb-close').addEventListener('click', lbClose);
+document.getElementById('lib-lb-overlay').addEventListener('click', lbClose);
+document.getElementById('lib-lb-prev').addEventListener('click', lbPrev);
+document.getElementById('lib-lb-next').addEventListener('click', lbNext);
+
+document.addEventListener('keydown', function(e) {
+  if (document.getElementById('lib-lightbox').style.display === 'none') return;
+  if (e.key === 'ArrowLeft')  lbPrev();
+  if (e.key === 'ArrowRight') lbNext();
+  if (e.key === 'Escape')     lbClose();
+});
+
+// Toggle used-in-projects section
+function libToggleUsed() {
+  var body = document.getElementById('lib-used-body');
+  var btn  = document.getElementById('lib-used-toggle');
+  if (!body) return;
+  var open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : '';
+  if (open) btn.classList.remove('open'); else btn.classList.add('open');
+}
+
+// Delegated click handler for all image cards (server-rendered + JS-built)
+document.getElementById('lib-batches').addEventListener('click', function(e) {
+  // Image click -> lightbox
+  var imgEl = e.target.closest('.lib-card img');
+  if (imgEl) { lbOpen(imgEl); return; }
+
+  var btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  var action = btn.getAttribute('data-action');
+  var img = btn.getAttribute('data-img');
+  if (!img) return;
+  if (action === 'delete') libDelete(img, btn);
+  if (action === 'start')  libStartProject(img, btn);
+});
+
+// Delegated click handler for used-in-projects section
+document.addEventListener('click', function(e) {
+  var imgEl = e.target.closest('.lib-used-card img');
+  if (imgEl) { lbOpen(imgEl); return; }
+
+  var btn = e.target.closest('button[data-action="delete-used"]');
+  if (!btn) return;
+  var img = btn.getAttribute('data-img');
+  if (!img) return;
+  libDeleteUsed(img, btn);
+});
+
+function libDeleteUsed(filename, btn) {
+  if (!confirm('Permanently delete this image?')) return;
+  btn.disabled = true;
+  var fd = new FormData();
+  fd.append('filename', filename);
+  fetch('/images/delete', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.ok) { btn.disabled = false; alert(d.error || 'Delete failed.'); return; }
+      var cardId = 'used-card-' + filename.replace(/[._]/g, '-');
+      var card = document.getElementById(cardId);
+      if (card) card.remove();
+    });
+}
+
+// Auto-start polling if we landed on the page while generating
+{% if generating %}
+document.getElementById('lib-gen-btn').disabled = true;
+libStartPolling();
+{% endif %}
+</script>
+</body>
+</html>

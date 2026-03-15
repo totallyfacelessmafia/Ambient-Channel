@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}UltraFocusZone Dashboard{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <nav class="navbar">
+    <a class="nav-brand" href="{{ url_for('index') }}">⚡ UltraFocusZone</a>
+    {% if session.user %}
+    <div class="nav-right">
+      <a class="nav-link {% if request.path == '/research' %}nav-link-active{% endif %}"
+         href="{{ url_for('research_page') }}">
+        Research
+        {% if g.research_unseen > 0 %}
+        <span class="nav-badge">{{ g.research_unseen }}</span>
+        {% endif %}
+      </a>
+      <span class="nav-user">{{ session.user }}</span>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('new_project_form') }}">+ New Project</a>
+      <form method="POST" action="{{ url_for('logout') }}" style="display:inline">
+        <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
+      </form>
+    </div>
+    {% endif %}
+  </nav>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

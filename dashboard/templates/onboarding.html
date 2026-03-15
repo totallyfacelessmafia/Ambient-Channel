@@ -1,0 +1,531 @@
+{% extends "base.html" %}
+{% block title %}Channel Setup — UltraFocusZone{% endblock %}
+
+{% block content %}
+<div class="onboarding-page">
+
+  <div class="onboarding-header">
+    <h1>Channel Setup</h1>
+    <p class="subtitle">Tell us about your channel so every video matches your style.</p>
+  </div>
+
+  <form method="POST" action="{{ url_for('onboarding_save') }}" id="onboarding-form">
+
+    <!-- ── Section 1: About Your Channel ── -->
+    <div class="ob-section">
+      <div class="ob-section-label">
+        <span class="ob-step-num">1</span>
+        <div>
+          <h2>About Your Channel</h2>
+          <p>Connect your YouTube channel so we can learn your visual style.</p>
+        </div>
+      </div>
+
+      <div class="ob-fields">
+        <div class="form-group">
+          <label for="channel_name">Channel Name</label>
+          <input type="text" id="channel_name" name="channel_name"
+                 value="{{ profile.channel_name }}"
+                 placeholder="e.g. Ultra Focus Zone">
+        </div>
+
+        <div class="form-group">
+          <label for="subtitle">Video Subtitle</label>
+          <input type="text" id="subtitle" name="subtitle"
+                 value="{{ profile.subtitle }}"
+                 placeholder="e.g. 1 Hour Deep Focus Music">
+          <small>Appears below the title in every video (e.g. "1 Hour Ambient Music for Deep Work").</small>
+        </div>
+
+        <div class="form-group">
+          <label for="channel_url">YouTube Channel URL</label>
+          <div class="input-action-row">
+            <input type="text" id="channel_url" name="channel_url"
+                   value="{{ profile.channel_url }}"
+                   placeholder="https://youtube.com/@YourChannel">
+            <button type="button" class="btn btn-ghost btn-sm" id="fetch-channel-btn">
+              Fetch Channel
+            </button>
+          </div>
+          <small id="fetch-channel-status" class="yt-fetch-status"></small>
+        </div>
+
+        <!-- Channel thumbnail preview strip -->
+        <div id="channel-thumb-area" class="{% if not profile.channel_thumbnails %}hidden{% endif %}">
+          <div class="ob-thumb-label">Recent videos from your channel:</div>
+          <div class="yt-thumb-strip" id="channel-thumbs">
+            {% for t in profile.channel_thumbnails %}
+            <div class="yt-thumb-card">
+              <img src="{{ t.thumbnail_url }}" alt="{{ t.title }}" class="yt-thumb" loading="lazy">
+              <div class="yt-thumb-title">{{ t.title|truncate(40, True) }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="niche">Channel Niche</label>
+          <input type="text" id="niche" name="niche"
+                 value="{{ profile.niche }}"
+                 placeholder="e.g. ambient lofi music for deep work and study">
+          <small>Describe what your channel is about in one sentence.</small>
+        </div>
+
+        <div class="form-group">
+          <label for="music_style">Music Style</label>
+          <input type="text" id="music_style" name="music_style"
+                 value="{{ profile.music_style }}"
+                 placeholder="e.g. electronic, ambient, deep, slow, warm, instrumental">
+          <small>Suno prompt tags for the background music generated with each video.</small>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Section 2: Visual Style ── -->
+    <div class="ob-section">
+      <div class="ob-section-label">
+        <span class="ob-step-num">2</span>
+        <div>
+          <h2>Visual Style</h2>
+          <p>Describe the look and feel you want for your thumbnails and backgrounds.</p>
+        </div>
+      </div>
+
+      <div class="ob-fields">
+        <div class="form-group">
+          <label>Vibe Tags</label>
+          <small>Pick tags that match your channel's mood.</small>
+          <div class="vibe-tags-grid">
+            {% for tag in vibe_options %}
+            <label class="vibe-chip {% if tag in profile.vibe_tags %}vibe-chip-selected{% endif %}">
+              <input type="checkbox" name="vibe_tags" value="{{ tag }}"
+                     {% if tag in profile.vibe_tags %}checked{% endif %}>
+              {{ tag }}
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="color_notes">Color Palette Notes</label>
+          <textarea id="color_notes" name="color_notes" rows="2"
+                    placeholder="e.g. dark warm tones, amber and gold lighting, rich blacks">{{ profile.color_notes }}</textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="scene_notes">Scene Notes</label>
+          <textarea id="scene_notes" name="scene_notes" rows="2"
+                    placeholder="e.g. cozy cabin interiors, rain on windows, warm fireplace, wooden shelves">{{ profile.scene_notes }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Section 3: Reference Thumbnails ── -->
+    <div class="ob-section">
+      <div class="ob-section-label">
+        <span class="ob-step-num">3</span>
+        <div>
+          <h2>Reference Thumbnails</h2>
+          <p>Upload thumbnails or add channels you admire. The more examples, the better.</p>
+        </div>
+      </div>
+
+      <div class="ob-fields">
+
+        <!-- Upload images -->
+        <div class="form-group">
+          <label>Upload Thumbnail Examples</label>
+          <small>Drag and drop images or click to browse. JPG / PNG, up to 20 MB each.</small>
+          <div class="upload-zone" id="upload-zone">
+            <div class="upload-zone-inner">
+              <div class="upload-icon">↑</div>
+              <div>Drop images here or <span class="upload-link">click to browse</span></div>
+            </div>
+            <input type="file" id="ref-upload-input" accept="image/*" multiple style="display:none">
+          </div>
+          <div class="ref-grid" id="ref-grid">
+            {% for fname in profile.style_refs %}
+            <div class="ref-thumb-card" data-filename="{{ fname }}">
+              <img src="{{ url_for('serve_style_ref', filename=fname) }}" alt="{{ fname }}" loading="lazy">
+              <button type="button" class="ref-delete-btn" data-filename="{{ fname }}" title="Remove">✕</button>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Reference channels -->
+        <div class="form-group">
+          <label>Reference Channels <span class="badge-optional">optional</span></label>
+          <small>Add YouTube channels whose thumbnail style you admire.</small>
+          <div class="input-action-row">
+            <input type="text" id="ref-channel-url" placeholder="https://youtube.com/@ChannelYouLike">
+            <button type="button" class="btn btn-ghost btn-sm" id="add-ref-channel-btn">
+              Add Channel
+            </button>
+          </div>
+          <small id="ref-channel-status" class="yt-fetch-status"></small>
+        </div>
+
+        <!-- Reference channel list -->
+        <div id="ref-channels-list">
+          {% for ref in profile.ref_channels %}
+          <div class="ref-channel-card" data-channel-id="{{ ref.channel_id }}">
+            <div class="ref-channel-header">
+              <span class="ref-channel-name">{{ ref.name }}</span>
+              <button type="button" class="ref-channel-delete-btn btn btn-danger btn-sm"
+                      data-channel-id="{{ ref.channel_id }}">Remove</button>
+            </div>
+            <div class="yt-thumb-strip">
+              {% for t in ref.thumbnails %}
+              <div class="yt-thumb-card">
+                <img src="{{ t.thumbnail_url }}" alt="{{ t.title }}" class="yt-thumb" loading="lazy">
+                <div class="yt-thumb-title">{{ t.title|truncate(40, True) }}</div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Section 4: Video Overlay ── -->
+    <div class="ob-section">
+      <div class="ob-section-label">
+        <span class="ob-step-num">4</span>
+        <div>
+          <h2>Video Overlay</h2>
+          <p>Choose a "Now Playing" style and optionally add your logo to every video.</p>
+        </div>
+      </div>
+
+      <div class="ob-fields">
+
+        <!-- Lower-third template picker -->
+        <div class="form-group">
+          <label>Lower Third Style</label>
+          <small>Appears in the bottom-left corner of the video showing song title, progress bar, and timestamps.</small>
+          <div class="overlay-style-grid">
+
+            <label class="overlay-style-card {% if profile.overlay_style == 'default' or not profile.overlay_style %}overlay-style-selected{% endif %}">
+              <input type="radio" name="overlay_style" value="default"
+                     {% if profile.overlay_style == 'default' or not profile.overlay_style %}checked{% endif %}>
+              <div class="overlay-style-preview overlay-preview-default">
+                <div class="op-panel">
+                  <div class="op-title">Song Title</div>
+                  <div class="op-bar"><div class="op-fill"></div></div>
+                  <div class="op-time">0:00 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 3:00</div>
+                </div>
+              </div>
+              <div class="overlay-style-name">Default</div>
+              <div class="overlay-style-desc">Glassmorphism frosted panel</div>
+            </label>
+
+            <label class="overlay-style-card {% if profile.overlay_style == 'minimal' %}overlay-style-selected{% endif %}">
+              <input type="radio" name="overlay_style" value="minimal"
+                     {% if profile.overlay_style == 'minimal' %}checked{% endif %}>
+              <div class="overlay-style-preview overlay-preview-minimal">
+                <div class="op-text-only">
+                  <div class="op-title">Song Title</div>
+                  <div class="op-bar-thin"><div class="op-fill-thin"></div></div>
+                </div>
+              </div>
+              <div class="overlay-style-name">Minimal</div>
+              <div class="overlay-style-desc">Text &amp; bar only, no panel</div>
+            </label>
+
+            <label class="overlay-style-card {% if profile.overlay_style == 'none' %}overlay-style-selected{% endif %}">
+              <input type="radio" name="overlay_style" value="none"
+                     {% if profile.overlay_style == 'none' %}checked{% endif %}>
+              <div class="overlay-style-preview overlay-preview-none">
+                <div class="op-off-label">No overlay</div>
+              </div>
+              <div class="overlay-style-name">Off</div>
+              <div class="overlay-style-desc">Clean video, no lower third</div>
+            </label>
+
+          </div>
+        </div>
+
+        <!-- Logo upload -->
+        <div class="form-group">
+          <label>Channel Logo <span class="badge-optional">optional</span></label>
+          <small>PNG or GIF — displayed in the top-left corner of every video. Max 5 MB. Recommended height: 80–120 px.</small>
+
+          {% if profile.logo_filename %}
+          <div class="logo-current" id="logo-current">
+            <img src="{{ url_for('serve_channel_logo', filename=profile.logo_filename) }}"
+                 alt="Current logo" class="logo-preview-img">
+            <button type="button" class="btn btn-danger btn-sm" id="logo-delete-btn">Remove Logo</button>
+          </div>
+          {% else %}
+          <div class="logo-current hidden" id="logo-current">
+            <img src="" alt="Current logo" class="logo-preview-img" id="logo-preview-img">
+            <button type="button" class="btn btn-danger btn-sm" id="logo-delete-btn">Remove Logo</button>
+          </div>
+          {% endif %}
+
+          <div class="upload-zone upload-zone-sm {% if profile.logo_filename %}hidden{% endif %}" id="logo-upload-zone">
+            <div class="upload-zone-inner">
+              <div class="upload-icon">↑</div>
+              <div>Drop PNG/GIF here or <span class="upload-link">click to browse</span></div>
+            </div>
+            <input type="file" id="logo-upload-input" accept=".png,.gif" style="display:none">
+          </div>
+          <small id="logo-upload-status" class="yt-fetch-status"></small>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Submit ── -->
+    <div class="ob-actions">
+      {% if profile.completed %}
+      <a href="{{ url_for('index') }}" class="btn btn-ghost">Cancel</a>
+      {% endif %}
+      <button type="submit" class="btn btn-primary ob-save-btn">
+        {% if profile.completed %}Save Changes{% else %}Save &amp; Continue →{% endif %}
+      </button>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Vibe chip toggle ──────────────────────────────────────────────────────────
+document.querySelectorAll('.vibe-chip input').forEach(function(cb) {
+  cb.addEventListener('change', function() {
+    cb.closest('.vibe-chip').classList.toggle('vibe-chip-selected', cb.checked);
+  });
+});
+
+// ── Fetch own channel ─────────────────────────────────────────────────────────
+document.getElementById('fetch-channel-btn').addEventListener('click', function() {
+  var url  = document.getElementById('channel_url').value.trim();
+  var stat = document.getElementById('fetch-channel-status');
+  if (!url) { stat.textContent = 'Please enter a channel URL first.'; return; }
+
+  stat.textContent = 'Fetching…';
+  var fd = new FormData();
+  fd.append('channel_url', url);
+
+  fetch('/onboarding/fetch-channel', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) { stat.textContent = 'Error: ' + data.error; return; }
+      stat.textContent = '✓ Found: ' + data.name + ' (' + data.channel_id + ')';
+      if (data.name && !document.getElementById('channel_name').value) {
+        document.getElementById('channel_name').value = data.name;
+      }
+      renderChannelThumbs(data.thumbnails);
+    })
+    .catch(function(e) { stat.textContent = 'Request failed.'; });
+});
+
+function renderChannelThumbs(thumbs) {
+  var area = document.getElementById('channel-thumb-area');
+  var strip = document.getElementById('channel-thumbs');
+  if (!thumbs || !thumbs.length) return;
+  strip.innerHTML = thumbs.map(function(t) {
+    return '<div class="yt-thumb-card">'
+      + '<img src="' + t.thumbnail_url + '" alt="" class="yt-thumb" loading="lazy">'
+      + '<div class="yt-thumb-title">' + (t.title || '').substring(0, 40) + '</div>'
+      + '</div>';
+  }).join('');
+  area.classList.remove('hidden');
+}
+
+// ── Upload style refs ─────────────────────────────────────────────────────────
+var uploadZone  = document.getElementById('upload-zone');
+var uploadInput = document.getElementById('ref-upload-input');
+
+uploadZone.addEventListener('click', function(e) {
+  if (e.target.tagName !== 'INPUT') uploadInput.click();
+});
+
+uploadZone.addEventListener('dragover', function(e) {
+  e.preventDefault();
+  uploadZone.classList.add('upload-zone-hover');
+});
+uploadZone.addEventListener('dragleave', function() {
+  uploadZone.classList.remove('upload-zone-hover');
+});
+uploadZone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  uploadZone.classList.remove('upload-zone-hover');
+  uploadFiles(e.dataTransfer.files);
+});
+
+uploadInput.addEventListener('change', function() {
+  uploadFiles(this.files);
+  this.value = '';
+});
+
+function uploadFiles(files) {
+  if (!files || !files.length) return;
+  var fd = new FormData();
+  for (var i = 0; i < files.length; i++) fd.append('images', files[i]);
+  fetch('/onboarding/upload-ref', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) return;
+      data.files.forEach(function(fname) { addRefThumb(fname); });
+    });
+}
+
+function addRefThumb(fname) {
+  var grid = document.getElementById('ref-grid');
+  var d = document.createElement('div');
+  d.className = 'ref-thumb-card';
+  d.dataset.filename = fname;
+  d.innerHTML = '<img src="/style-refs/' + fname + '" alt="" loading="lazy">'
+    + '<button type="button" class="ref-delete-btn" data-filename="' + fname + '" title="Remove">✕</button>';
+  grid.appendChild(d);
+  d.querySelector('.ref-delete-btn').addEventListener('click', deleteRef);
+}
+
+// ── Delete style ref ──────────────────────────────────────────────────────────
+document.getElementById('ref-grid').addEventListener('click', function(e) {
+  var btn = e.target.closest('.ref-delete-btn');
+  if (btn) deleteRef.call(btn);
+});
+
+function deleteRef() {
+  var fname = this.dataset.filename;
+  var card  = this.closest('.ref-thumb-card');
+  var fd = new FormData();
+  fd.append('filename', fname);
+  fetch('/onboarding/delete-ref', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.ok && card) card.remove(); });
+}
+
+// ── Add reference channel ─────────────────────────────────────────────────────
+document.getElementById('add-ref-channel-btn').addEventListener('click', function() {
+  var url  = document.getElementById('ref-channel-url').value.trim();
+  var stat = document.getElementById('ref-channel-status');
+  if (!url) { stat.textContent = 'Please enter a channel URL.'; return; }
+
+  stat.textContent = 'Fetching…';
+  var fd = new FormData();
+  fd.append('channel_url', url);
+
+  fetch('/onboarding/fetch-ref-channel', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) { stat.textContent = 'Error: ' + data.error; return; }
+      stat.textContent = '✓ Added: ' + data.name;
+      document.getElementById('ref-channel-url').value = '';
+      addRefChannelCard(data);
+    })
+    .catch(function() { stat.textContent = 'Request failed.'; });
+});
+
+function addRefChannelCard(data) {
+  var list = document.getElementById('ref-channels-list');
+  var d = document.createElement('div');
+  d.className = 'ref-channel-card';
+  d.dataset.channelId = data.channel_id;
+  var thumbsHtml = (data.thumbnails || []).map(function(t) {
+    return '<div class="yt-thumb-card">'
+      + '<img src="' + t.thumbnail_url + '" alt="" class="yt-thumb" loading="lazy">'
+      + '<div class="yt-thumb-title">' + (t.title || '').substring(0, 40) + '</div>'
+      + '</div>';
+  }).join('');
+  d.innerHTML = '<div class="ref-channel-header">'
+    + '<span class="ref-channel-name">' + data.name + '</span>'
+    + '<button type="button" class="ref-channel-delete-btn btn btn-danger btn-sm" data-channel-id="' + data.channel_id + '">Remove</button>'
+    + '</div>'
+    + '<div class="yt-thumb-strip">' + thumbsHtml + '</div>';
+  list.appendChild(d);
+  d.querySelector('.ref-channel-delete-btn').addEventListener('click', deleteRefChannel);
+}
+
+// ── Delete reference channel ──────────────────────────────────────────────────
+document.getElementById('ref-channels-list').addEventListener('click', function(e) {
+  var btn = e.target.closest('.ref-channel-delete-btn');
+  if (btn) deleteRefChannel.call(btn);
+});
+
+function deleteRefChannel() {
+  var cid  = this.dataset.channelId;
+  var card = this.closest('.ref-channel-card');
+  var fd = new FormData();
+  fd.append('channel_id', cid);
+  fetch('/onboarding/delete-ref-channel', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) { if (data.ok && card) card.remove(); });
+}
+
+// ── Overlay style card selection ──────────────────────────────────────────────
+document.querySelectorAll('.overlay-style-card input[type="radio"]').forEach(function(radio) {
+  radio.addEventListener('change', function() {
+    document.querySelectorAll('.overlay-style-card').forEach(function(c) {
+      c.classList.remove('overlay-style-selected');
+    });
+    radio.closest('.overlay-style-card').classList.add('overlay-style-selected');
+  });
+});
+
+// ── Logo upload ───────────────────────────────────────────────────────────────
+var logoZone    = document.getElementById('logo-upload-zone');
+var logoInput   = document.getElementById('logo-upload-input');
+var logoStat    = document.getElementById('logo-upload-status');
+var logoCurrent = document.getElementById('logo-current');
+
+logoZone.addEventListener('click', function(e) {
+  if (e.target.tagName !== 'INPUT') logoInput.click();
+});
+logoZone.addEventListener('dragover', function(e) {
+  e.preventDefault(); logoZone.classList.add('upload-zone-hover');
+});
+logoZone.addEventListener('dragleave', function() {
+  logoZone.classList.remove('upload-zone-hover');
+});
+logoZone.addEventListener('drop', function(e) {
+  e.preventDefault();
+  logoZone.classList.remove('upload-zone-hover');
+  uploadLogo(e.dataTransfer.files[0]);
+});
+logoInput.addEventListener('change', function() {
+  if (this.files[0]) uploadLogo(this.files[0]);
+  this.value = '';
+});
+
+function uploadLogo(file) {
+  if (!file) return;
+  logoStat.textContent = 'Uploading…';
+  var fd = new FormData();
+  fd.append('logo', file);
+  fetch('/onboarding/upload-logo', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) { logoStat.textContent = 'Error: ' + data.error; return; }
+      logoStat.textContent = '✓ Logo saved.';
+      var img = logoCurrent.querySelector('img');
+      if (img) img.src = '/channel-logo/' + data.filename + '?t=' + Date.now();
+      logoCurrent.classList.remove('hidden');
+      logoZone.classList.add('hidden');
+    })
+    .catch(function() { logoStat.textContent = 'Upload failed.'; });
+}
+
+var logoDeleteBtn = document.getElementById('logo-delete-btn');
+if (logoDeleteBtn) {
+  logoDeleteBtn.addEventListener('click', function() {
+    fetch('/onboarding/delete-logo', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.ok) {
+          logoCurrent.classList.add('hidden');
+          logoZone.classList.remove('hidden');
+          logoStat.textContent = '';
+        }
+      });
+  });
+}
+</script>
+{% endblock %}

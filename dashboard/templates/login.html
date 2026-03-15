@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — ChannelForge</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='home.css') }}">
+</head>
+<body class="home-body">
+  <nav class="home-nav">
+    <a class="home-nav-brand" href="/">&#9889; ChannelForge</a>
+    <div class="home-nav-right">
+      <a href="{{ url_for('register_page') }}" class="btn btn-primary btn-sm">Get Started Free</a>
+    </div>
+  </nav>
+
+  <div class="auth-page">
+    <div class="auth-card">
+      <h1 class="auth-title">Welcome back</h1>
+      <p class="auth-subtitle">Sign in to your ChannelForge dashboard.</p>
+
+      {% if error %}
+      <div class="auth-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('login_page') }}" class="auth-form">
+        <div class="auth-field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" required autofocus
+                 autocomplete="email" placeholder="you@example.com">
+        </div>
+        <div class="auth-field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required
+                 autocomplete="current-password" placeholder="Your password">
+        </div>
+        <div class="auth-forgot">
+          <a href="{{ url_for('forgot_password_page') }}">Forgot your password?</a>
+        </div>
+        <button type="submit" class="btn btn-primary auth-btn">Sign In</button>
+      </form>
+
+      <p class="auth-alt">Don't have an account? <a href="{{ url_for('register_page') }}">Create one free</a></p>
+    </div>
+  </div>
+</body>
+</html>

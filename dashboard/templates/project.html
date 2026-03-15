@@ -1,0 +1,910 @@
+{% extends "base.html" %}
+{% block title %}{{ project.title or 'Untitled Project' }} &mdash; UltraFocusZone{% endblock %}
+
+{% block content %}
+<div class="project-page">
+
+  <!-- Header -->
+  <div class="project-header">
+    <div>
+      <a class="back-link" href="{{ url_for('index') }}">&larr; Dashboard</a>
+      <h1>{{ project.title or 'Untitled Project' }}</h1>
+      <span class="status-badge status-{{ project.status }}">
+        {% if project.status == 'running' %}&#11044; Running
+        {% elif project.status == 'done'  %}&#10003; Done
+        {% elif project.status == 'error' %}&#10005; Error
+        {% else                            %}&#11044; Idle
+        {% endif %}
+      </span>
+    </div>
+    <form method="POST" action="{{ url_for('delete_project', pid=project.id) }}"
+          onsubmit="return confirm('Delete this project?')">
+      <button type="submit" class="btn btn-danger">Delete</button>
+    </form>
+  </div>
+
+  <!-- Step timeline -->
+  <div class="step-timeline">
+    {% for n, label in [(1,'Image'), (2,'Loop'), (3,'Video')] %}
+    <div class="step-node
+      {% if project.step > n %}step-done
+      {% elif project.step == n %}step-active
+      {% else %}step-locked{% endif %}"
+      {% if project.step > n %}onclick="goBackToStep('{{ project.id }}', {{ n }})" title="Go back to Step {{ n }}"{% endif %}>
+      <div class="step-circle">
+        {% if project.step > n %}&#10003;{% else %}{{ n }}{% endif %}
+      </div>
+      <span class="step-label">{{ label }}</span>
+    </div>
+    <div class="step-connector {% if project.step > n %}step-connector-done{% endif %}"></div>
+    {% endfor %}
+    {% set yt_status = project.youtube.upload_status %}
+    <div class="step-node {% if yt_status == 'done' %}step-done{% elif project.status == 'done' %}step-active{% else %}step-locked{% endif %}">
+      <div class="step-circle">
+        {% if yt_status == 'done' %}&#10003;{% else %}4{% endif %}
+      </div>
+      <span class="step-label">Upload</span>
+    </div>
+  </div>
+
+  <!-- ================================================================
+       STEP 1 &mdash; Generate AI Image
+  ================================================================ -->
+  <div class="step-panel {% if project.step > 1 %}step-panel-collapsed{% endif %}"
+       id="step1-panel">
+    <div class="step-panel-header{% if project.step > 1 %} clickable{% endif %}"
+         {% if project.step > 1 %}onclick="goBackToStep('{{ project.id }}', 1)" title="Click to go back to Step 1"{% endif %}>
+      <h2>Step 1 &mdash; Generate AI Image</h2>
+      {% if project.step > 1 %}<span class="badge badge-done">Approved</span>{% endif %}
+    </div>
+
+    {% if project.step > 1 %}
+      <!-- Collapsed summary -->
+      {% if project.files.thumbnail %}
+      <img class="approved-thumb"
+           src="{{ url_for('serve_file', fp=project.files.thumbnail|basename) }}"
+           alt="{{ project.title }}">
+      {% endif %}
+
+    {% else %}
+      <!-- Active step 1 -->
+      <p class="prompt-preview"><em>"{{ project.prompt }}"</em></p>
+
+      {% if project.status == 'running' and project.task.step_running == 1 %}
+        <!-- Running: generating candidates or finalizing -->
+        <div class="task-running">
+          <div class="spinner"></div>
+          {% if project.files.raw_image %}
+            <span>Generating thumbnail from your selected title...</span>
+          {% elif project.candidate_images %}
+            <span>Generating background from your selected image...</span>
+          {% else %}
+            <span>Generating 4 images via fal.ai FLUX Pro...</span>
+          {% endif %}
+          <span class="elapsed" id="elapsed">0:00</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="progress-fill"
+               style="width:{{ project.task.progress_pct }}%"></div>
+        </div>
+        <pre class="log-box" id="log-box">{{ project.task.log|join('\n') }}</pre>
+
+      {% elif project.files.raw_image and project.files.thumbnail %}
+        <!-- Image selected + background/thumbnail ready for final approval -->
+        <div class="preview-grid">
+          <div>
+            <p class="preview-label">Selected image</p>
+            <img class="preview-img"
+                 src="{{ url_for('serve_file', fp=project.files.raw_image|basename) }}"
+                 alt="Selected image">
+          </div>
+          <div>
+            <p class="preview-label">Thumbnail (1280&times;720)</p>
+            <img class="preview-img"
+                 src="{{ url_for('serve_file', fp=project.files.thumbnail|basename) }}"
+                 alt="Thumbnail">
+          </div>
+        </div>
+
+        {% if project.status == 'error' %}
+        <div class="error-banner">{{ project.task.error }}</div>
+        {% endif %}
+
+        <div class="action-row" style="flex-wrap:wrap; gap:8px;">
+          <button class="btn btn-success"
+                  onclick="triggerTask('{{ project.id }}', 'step1/approve')">
+            Approve &amp; Continue &rarr;
+          </button>
+          <span style="font-size:13px; color:var(--muted); align-self:center;">Redo text:</span>
+          <button class="btn btn-ghost btn-sm pos-btn pos-btn-active" id="pos-top"
+                  onclick="setTitlePos('top')">Top</button>
+          <button class="btn btn-ghost btn-sm pos-btn" id="pos-middle"
+                  onclick="setTitlePos('middle')">Middle</button>
+          <button class="btn btn-ghost btn-sm pos-btn" id="pos-bottom"
+                  onclick="setTitlePos('bottom')">Bottom</button>
+          <button class="btn btn-ghost"
+                  onclick="redoThumbnail('{{ project.id }}', '{{ project.title }}')">
+            Redo Thumbnail
+          </button>
+        </div>
+
+      {% elif project.files.raw_image %}
+        <!-- Image selected + background ready; user now picks a title -->
+        <div class="preview-grid">
+          <div>
+            <p class="preview-label">Selected image</p>
+            <img class="preview-img"
+                 src="{{ url_for('serve_file', fp=project.files.raw_image|basename) }}"
+                 alt="Selected image">
+          </div>
+          <div>
+            <p class="preview-label">Background (1920&times;1080)</p>
+            <img class="preview-img"
+                 src="{{ url_for('serve_file', fp=project.files.background|basename) }}"
+                 alt="Background">
+          </div>
+        </div>
+
+        <div class="title-picker">
+          <p class="preview-label" style="margin-bottom:10px">Pick a title for the thumbnail</p>
+          {% if project.title_suggestions %}
+          <div class="title-chip-grid">
+            {% for suggestion in project.title_suggestions %}
+            <button type="button"
+                    class="title-chip"
+                    onclick='chooseTitleSuggestion({{ suggestion|tojson }}, this)'>
+              {{ suggestion }}
+            </button>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <input type="text" id="custom-title-input"
+                 placeholder="Or type your own thumbnail text&hellip;"
+                 oninput="onCustomTitleInput(this)"
+                 style="margin-top:12px; width:100%; padding:9px 14px; font-size:14px;
+                        background:var(--bg); border:1px solid var(--border);
+                        border-radius:8px; color:var(--text);">
+          <div class="action-row" style="margin-top:12px; align-items:center; gap:8px;">
+            <span style="font-size:13px; color:var(--muted);">Text position:</span>
+            <button type="button" id="pos-top" class="btn btn-ghost btn-sm pos-btn pos-btn-active"
+                    onclick="setTitlePos('top')">Top</button>
+            <button type="button" id="pos-bottom" class="btn btn-ghost btn-sm pos-btn"
+                    onclick="setTitlePos('bottom')">Bottom</button>
+          </div>
+          <div class="action-row" style="margin-top:8px">
+            <button class="btn btn-primary" onclick="startSetTitle('{{ project.id }}')">
+              Generate Thumbnail
+            </button>
+          </div>
+        </div>
+
+        {% if project.status == 'error' %}
+        <div class="error-banner">{{ project.task.error }}</div>
+        {% endif %}
+
+      {% elif project.candidate_images %}
+        <!-- 4 candidates ready &mdash; user picks one or more -->
+        <p class="preview-label" style="margin-bottom:14px">
+          Pick one or more images you want to use:
+        </p>
+        <div class="candidate-grid">
+          {% for img_path in project.candidate_images %}
+          <div class="candidate-card" id="cand-{{ loop.index }}">
+            <img src="{{ url_for('serve_file', fp=img_path|basename) }}"
+                 alt="Candidate {{ loop.index }}"
+                 onclick='toggleCandidate({{ img_path|tojson }}, {{ loop.index }})'>
+            <button class="btn btn-primary candidate-select-btn"
+                    type="button"
+                    onclick='toggleCandidate({{ img_path|tojson }}, {{ loop.index }})'>
+              Select image
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% if project.status == 'error' %}
+        <div class="error-banner">{{ project.task.error }}</div>
+        {% endif %}
+
+        <div class="action-row" style="margin-top:20px">
+          <button class="btn btn-primary"
+                  onclick="submitSelectedCandidates('{{ project.id }}')">
+            Use Selected Images
+          </button>
+          <button class="btn btn-ghost"
+                  onclick="triggerTask('{{ project.id }}','step1/regenerate')">
+            Generate 4 New Images
+          </button>
+        </div>
+
+      {% else %}
+        <!-- Not started yet -->
+        {% if project.status == 'error' %}
+        <div class="error-banner">{{ project.task.error }}</div>
+        {% endif %}
+        <div class="action-row">
+          <button class="btn btn-primary"
+                  onclick="triggerTask('{{ project.id }}','step1/start')">
+            Generate 4 Images
+          </button>
+        </div>
+        <p class="hint">Cinematic style is applied automatically. ~10&mdash;15 seconds.</p>
+      {% endif %}
+    {% endif %}
+  </div><!-- /step1 -->
+
+
+  <!-- ================================================================
+       STEP 2 — Video Loop
+  ================================================================ -->
+  <style>
+    .loop-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 900px) { .loop-comparison { grid-template-columns: 1fr; } }
+    .loop-slot {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .loop-slot-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+    .loop-slot-label {
+      font-size: 13px; font-weight: 600; color: var(--text);
+      white-space: nowrap;
+    }
+    .loop-slot-model-tag {
+      font-size: 11px; color: var(--muted);
+      background: var(--bg); border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 7px;
+    }
+    .loop-slot video { width: 100%; display: block; max-height: 340px; background: #000; }
+    .loop-slot-empty {
+      display: flex; align-items: center; justify-content: center;
+      height: 200px; color: var(--muted); font-size: 13px;
+    }
+    .loop-slot-controls {
+      display: flex; gap: 8px; align-items: center; padding: 10px 14px;
+      border-top: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .loop-slot-controls select { flex: 1; min-width: 0; font-size: 13px; padding: 6px 8px; }
+    .loop-slot-controls .btn { font-size: 13px; white-space: nowrap; }
+  </style>
+
+  <div class="step-panel
+    {% if project.step < 2 %}step-panel-locked
+    {% elif project.step > 2 %}step-panel-collapsed{% endif %}"
+       id="step2-panel">
+    <div class="step-panel-header{% if project.step > 2 %} clickable{% endif %}"
+         {% if project.step > 2 %}onclick="goBackToStep('{{ project.id }}', 2)" title="Click to go back to Step 2"{% endif %}>
+      <h2>Step 2 — Generate Video Loop</h2>
+      {% if project.step > 2 %}<span class="badge badge-done">Approved</span>
+      {% elif project.step < 2 %}<span class="badge badge-locked">Locked</span>{% endif %}
+    </div>
+
+    {% if project.step < 2 %}
+      <p class="locked-msg">Complete Step 1 first.</p>
+
+    {% elif project.step > 2 %}
+      <!-- Collapsed summary — show the chosen slot (files.loop is set by step2_approve) -->
+      {% set _collapsed_loop = project.files.loop or project.files.loop_a or project.files.loop30 %}
+      {% if _collapsed_loop %}
+      <video class="approved-video" src="{{ url_for('serve_file', fp=_collapsed_loop|basename) }}"
+             autoplay loop muted playsinline></video>
+      {% endif %}
+
+    {% else %}
+      <!-- Active step 2 -->
+      {% if project.status == 'running' and project.task.step_running == 2 %}
+        <div class="task-running">
+          <div class="spinner"></div>
+          <span>Generating comparison loops via fal.ai…</span>
+          <span class="elapsed" id="elapsed">0:00</span>
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar-fill" id="progress-fill"
+               style="width:{{ project.task.progress_pct }}%"></div>
+        </div>
+        <pre class="log-box" id="log-box">{{ project.task.log|join('\n') }}</pre>
+
+      {% elif project.files.loop_a or project.files.loop_b %}
+        <!-- At least one slot ready — show comparison view -->
+        {% if project.status == 'error' and project.task.error %}
+        <div class="error-banner">{{ project.task.error }}</div>
+        {% endif %}
+
+        <div class="loop-comparison">
+
+          <!-- ── Slot A ─────────────────────────────────────────── -->
+          <div class="loop-slot" id="slot-a-card">
+            <div class="loop-slot-header">
+              <span class="loop-slot-label">Slot A</span>
+              {% if project.files.loop_a_model %}
+              <span class="loop-slot-model-tag">{{ project.files.loop_a_model }}</span>
+              {% endif %}
+            </div>
+            {% if project.files.loop_a %}
+            <video src="{{ url_for('serve_file', fp=project.files.loop_a|basename) }}"
+                   controls loop playsinline></video>
+            {% else %}
+            <div class="loop-slot-empty">Failed — select a model and regenerate</div>
+            {% endif %}
+            <div class="loop-slot-controls">
+              <select id="slot-a-model" class="form-select">
+                <option value="kling_v16"     {% if project.files.loop_a_model == 'kling_v16'     %}selected{% endif %}>Kling v1.6 (~$0.25) ⚠ may time-lapse</option>
+                <option value="kling_v21"     {% if project.files.loop_a_model == 'kling_v21'     %}selected{% endif %}>Kling v2.1 (~$0.28) ⚠ may time-lapse</option>
+                <option value="seedance_lite" {% if project.files.loop_a_model == 'seedance_lite' %}selected{% endif %}>Seedance Lite (~$0.36, camera_fixed)</option>
+                <option value="seedance_pro"  {% if project.files.loop_a_model == 'seedance_pro'  %}selected{% endif %}>Seedance Pro (~$1.24, camera_fixed, 1080p)</option>
+                <option value="hailuo_pro"    {% if project.files.loop_a_model == 'hailuo_pro'    %}selected{% endif %}>Hailuo-02 Pro (~$0.48)</option>
+              </select>
+              <button class="btn btn-ghost" onclick="regenSlot('{{ project.id }}', 'a')">
+                ↺ Regenerate
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Slot B ─────────────────────────────────────────── -->
+          <div class="loop-slot" id="slot-b-card">
+            <div class="loop-slot-header">
+              <span class="loop-slot-label">Slot B</span>
+              {% if project.files.loop_b_model %}
+              <span class="loop-slot-model-tag">{{ project.files.loop_b_model }}</span>
+              {% endif %}
+            </div>
+            {% if project.files.loop_b %}
+            <video src="{{ url_for('serve_file', fp=project.files.loop_b|basename) }}"
+                   controls loop playsinline></video>
+            {% else %}
+            <div class="loop-slot-empty">Failed — select a model and regenerate</div>
+            {% endif %}
+            <div class="loop-slot-controls">
+              <select id="slot-b-model" class="form-select">
+                <option value="kling_v16"     {% if project.files.loop_b_model == 'kling_v16'     %}selected{% endif %}>Kling v1.6 (~$0.25) ⚠ may time-lapse</option>
+                <option value="kling_v21"     {% if project.files.loop_b_model == 'kling_v21'     %}selected{% endif %}>Kling v2.1 (~$0.28) ⚠ may time-lapse</option>
+                <option value="seedance_lite" {% if project.files.loop_b_model == 'seedance_lite' %}selected{% endif %}>Seedance Lite (~$0.36, camera_fixed)</option>
+                <option value="seedance_pro"  {% if project.files.loop_b_model == 'seedance_pro'  %}selected{% endif %}>Seedance Pro (~$1.24, camera_fixed, 1080p)</option>
+                <option value="hailuo_pro"    {% if project.files.loop_b_model == 'hailuo_pro'    %}selected{% endif %}>Hailuo-02 Pro (~$0.48)</option>
+              </select>
+              <button class="btn btn-ghost" onclick="regenSlot('{{ project.id }}', 'b')">
+                ↺ Regenerate
+              </button>
+            </div>
+          </div>
+
+        </div><!-- /loop-comparison -->
+
+        <div class="action-row" style="flex-wrap:wrap; gap:8px; margin-top:16px;">
+          <span style="font-size:13px; color:var(--muted); align-self:center;">Use:</span>
+          <button class="btn btn-success"
+                  onclick="approveStep2('{{ project.id }}', 'a')">
+            ✓ Slot A
+          </button>
+          <button class="btn btn-success"
+                  onclick="approveStep2('{{ project.id }}', 'b')">
+            ✓ Slot B
+          </button>
+          <button class="btn btn-ghost" onclick="startStep2Regen('{{ project.id }}')">
+            ↺ Regenerate Both
+          </button>
+        </div>
+
+      {% else %}
+        <!-- No loops yet -->
+        {% if project.status == 'error' %}
+        <div class="error-banner">{{ project.task.error }}</div>
+        {% endif %}
+
+        {% if project.files.background %}
+        <img class="preview-img preview-img-sm"
+             src="{{ url_for('serve_file', fp=project.files.background|basename) }}"
+             alt="Background">
+        {% endif %}
+
+        <div class="action-row" style="margin-top:16px">
+          <button class="btn btn-primary" onclick="startStep2('{{ project.id }}')">
+            ✦ Generate Loops
+          </button>
+        </div>
+        <p class="hint">Generates two comparison clips in sequence: <strong>Kling v1.6</strong> and <strong>Seedance v1 Pro</strong> (camera_fixed). Takes ~2–4 minutes total (~$0.87).</p>
+      {% endif %}
+    {% endif %}
+  </div><!-- /step2 -->
+
+
+  <!-- ================================================================
+       STEP 3 &mdash; Build 1-Hour Video
+  ================================================================ -->
+  <div class="step-panel {% if project.step < 3 %}step-panel-locked{% endif %}"
+       id="step3-panel">
+    <div class="step-panel-header">
+      <h2>Step 3 &mdash; Build 1-Hour Video</h2>
+      {% if project.step < 3 %}<span class="badge badge-locked">Locked</span>{% endif %}
+    </div>
+
+    {% if project.step < 3 %}
+      <p class="locked-msg">Complete Steps 1 &amp; 2 first.</p>
+
+    {% elif project.status == 'running' and project.task.step_running == '2b' %}
+      <!-- Suno running -->
+      <div class="task-running">
+        <div class="spinner"></div>
+        <span>Generating music via Suno &mdash; Chrome is open, do not close it&hellip;</span>
+        <span class="elapsed" id="elapsed">0:00</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-fill"
+             style="width:{{ project.task.progress_pct }}%"></div>
+      </div>
+      <pre class="log-box" id="log-box">{{ project.task.log|join('\n') }}</pre>
+
+    {% elif project.status == 'done' %}
+      <!-- Done -->
+      <div class="success-banner">
+        <p>&#10003; Video complete!</p>
+        {% if project.files.final_video %}
+        <p class="final-path">{{ project.files.final_video }}</p>
+        {% endif %}
+      </div>
+      <div class="action-row" style="margin-top:12px">
+        <button class="btn btn-primary" onclick="proceedToStep4('{{ project.id }}')">
+          Proceed to SEO &amp; Upload &rarr;
+        </button>
+      </div>
+
+    {% elif project.status == 'running' and project.task.step_running == 3 %}
+      <!-- Running -->
+      <div class="task-running">
+        <div class="spinner"></div>
+        <span>Building video &mdash; this takes ~10&mdash;15 minutes...</span>
+        <span class="elapsed" id="elapsed">0:00</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-fill"
+             style="width:{{ project.task.progress_pct }}%"></div>
+      </div>
+      <pre class="log-box log-box-tall" id="log-box">{{ project.task.log|join('\n') }}</pre>
+
+    {% else %}
+      <!-- Configure and start -->
+      {% if project.status == 'error' %}
+      <div class="error-banner">{{ project.task.error }}</div>
+      {% endif %}
+
+      {% if project.files.final_video %}
+      <!-- Video exists from a previous build — offer to skip re-render -->
+      <div class="success-banner" style="margin-bottom:16px">
+        <p>&#10003; A completed video already exists.</p>
+        <p class="final-path">{{ project.files.final_video }}</p>
+      </div>
+      <div class="action-row" style="margin-bottom:20px; flex-wrap:wrap; gap:8px">
+        <button class="btn btn-primary" onclick="proceedToStep4('{{ project.id }}')">
+          Use This Video &rarr; SEO &amp; Upload
+        </button>
+        <span style="font-size:13px; color:var(--muted); align-self:center">or re-render below to use the updated loop</span>
+      </div>
+      {% endif %}
+
+      <!-- Optional: Suno music generation -->
+      <div class="suno-panel">
+        <div class="suno-panel-header">
+          <h3>Generate Music via Suno</h3>
+          <span class="badge-optional">Optional</span>
+          <span style="margin-left:auto; font-size:13px; color:var(--muted)">
+            {{ song_total }} track{{ 's' if song_total != 1 else '' }} in music/ folder
+          </span>
+        </div>
+        <p class="hint" style="margin-bottom:12px">
+          Generates ~18 ambient tracks via Suno.ai into your music/ folder.
+          Skip if you already have tracks there.
+          Chrome will open on your desktop &mdash; takes 10&mdash;30 minutes.
+        </p>
+        <div class="action-row" style="flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:0">
+          <div class="form-group" style="margin:0; flex:1; min-width:200px">
+            <label style="font-size:13px; margin-bottom:4px; display:block">Music style</label>
+            <input type="text" id="suno-prompt" value="electronic, ambient, deep, slow, warm, instrumental"
+                   style="width:100%">
+          </div>
+          <button class="btn btn-ghost" onclick="startSuno('{{ project.id }}')">
+            Generate Music
+          </button>
+        </div>
+      </div>
+
+      <form id="step3-form" class="step3-form" style="margin-top:20px">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="song_count">Number of songs</label>
+            <input type="number" id="song_count" name="song_count"
+                   value="{{ project.song_config.count }}"
+                   min="1" max="{{ song_total }}">
+            <small>{{ song_total }} songs available (A&mdash;Z)</small>
+          </div>
+          <div class="form-group">
+            <label for="crossfade_sec">Crossfade (seconds)</label>
+            <input type="number" id="crossfade_sec" name="crossfade_sec"
+                   value="{{ project.song_config.crossfade_sec }}"
+                   step="0.5" min="0" max="10">
+          </div>
+          <div class="form-group">
+            <label for="channel_name">Channel name</label>
+            <input type="text" id="channel_name" name="channel_name"
+                   value="{{ project.song_config.channel_name }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="overlay" name="overlay"
+                   {% if project.song_config.get('overlay', True) %}checked{% endif %}>
+            Include "Now Playing" overlay
+          </label>
+        </div>
+        <div class="action-row">
+          <button type="button" class="btn btn-primary"
+                  onclick="startStep3('{{ project.id }}')">
+            Start Build
+          </button>
+        </div>
+      </form>
+      <p class="hint">Estimated time: 10&mdash;15 minutes</p>
+    {% endif %}
+  </div><!-- /step3 -->
+
+  <!-- ================================================================
+       STEP 4 — SEO & YouTube Upload
+  ================================================================ -->
+  {% set yt = project.youtube %}
+  <div class="step-panel {% if project.status != 'done' and yt.upload_status not in ('uploading','done','error') %}step-panel-locked{% endif %}"
+       id="step4-panel">
+    <div class="step-panel-header">
+      <h2>Step 4 &mdash; SEO &amp; YouTube Upload</h2>
+      {% if yt.upload_status == 'done' %}<span class="badge badge-done">Uploaded</span>
+      {% elif project.status != 'done' and yt.upload_status not in ('uploading','error') %}<span class="badge badge-locked">Locked</span>{% endif %}
+    </div>
+
+    {% if project.status != 'done' and yt.upload_status not in ('uploading','done','error') %}
+      <p class="locked-msg">Complete Step 3 first.</p>
+
+    {% elif project.task.step_running == '4seo' and project.task.running %}
+      <div class="task-running">
+        <div class="spinner"></div>
+        <span>Generating SEO title, description &amp; tags&hellip;</span>
+      </div>
+
+    {% elif project.task.step_running == '4upload' and project.task.running %}
+      <div class="task-running">
+        <div class="spinner"></div>
+        <span>Uploading to YouTube&hellip;</span>
+        <span class="elapsed" id="elapsed">0:00</span>
+      </div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-fill"
+             style="width:{{ project.task.progress_pct }}%"></div>
+      </div>
+      <pre class="log-box" id="log-box">{{ project.task.log|join('\n') }}</pre>
+
+    {% elif yt.upload_status == 'done' %}
+      <div class="success-banner">
+        <p>&#10003; Uploaded to YouTube!</p>
+        {% if yt.video_id %}
+        <p><a href="https://youtu.be/{{ yt.video_id }}" target="_blank" style="color:var(--success)">
+          youtu.be/{{ yt.video_id }}</a></p>
+        {% endif %}
+        {% if yt.scheduled_publish_at %}
+        <p style="font-size:13px; color:var(--muted); margin-top:4px">
+          Scheduled: {{ yt.scheduled_publish_at }}</p>
+        {% endif %}
+      </div>
+
+    {% else %}
+      {% if yt.upload_status == 'error' %}
+      <div class="error-banner">Upload error: {{ yt.upload_error or 'Unknown error' }}</div>
+      {% endif %}
+      {% if project.task.error and not project.task.running %}
+      <div class="error-banner">{{ project.task.error }}</div>
+      {% endif %}
+
+      <!-- SEO section -->
+      <div style="margin-bottom:20px">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
+          <h3 style="font-size:15px; font-weight:600; margin:0">YouTube SEO</h3>
+          <button class="btn btn-ghost btn-sm" onclick="step4GenerateSeo('{{ project.id }}')">
+            &#9889; Auto-Generate
+          </button>
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label style="font-size:13px">Title</label>
+          <input type="text" id="step4-seo-title"
+                 value="{{ project.seo.title or project.title or '' }}"
+                 style="width:100%">
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label style="font-size:13px">Description</label>
+          <textarea id="step4-seo-desc" rows="8"
+                    style="width:100%; resize:vertical; font-size:13px">{{ project.seo.description or '' }}</textarea>
+        </div>
+        <div class="form-group" style="margin-bottom:10px">
+          <label style="font-size:13px">Tags (comma-separated)</label>
+          <input type="text" id="step4-seo-tags"
+                 value="{{ (project.seo.tags or []) | join(', ') }}"
+                 style="width:100%">
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick="step4SaveSeo('{{ project.id }}')">
+          Save SEO
+        </button>
+      </div>
+
+      <!-- Publish schedule -->
+      <div style="margin-bottom:20px">
+        <h3 style="font-size:15px; font-weight:600; margin-bottom:8px">Publish Schedule</h3>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
+          {% set pub_val = (yt.scheduled_publish_at or '')[:16] %}
+          <input type="datetime-local" id="step4-publish-at" value="{{ pub_val }}"
+                 style="flex:1; min-width:220px">
+          <button class="btn btn-ghost btn-sm" onclick="step4SetPublishTime('{{ project.id }}')">Set</button>
+          {% if yt.scheduled_publish_at %}
+          <button class="btn btn-ghost btn-sm" onclick="step4ClearPublishTime('{{ project.id }}')">Clear</button>
+          {% endif %}
+        </div>
+        {% if yt.scheduled_publish_at %}
+        <p class="hint" style="margin-top:6px">Scheduled: {{ yt.scheduled_publish_at }}</p>
+        {% else %}
+        <p class="hint" style="margin-top:6px">Leave empty to publish immediately as public.</p>
+        {% endif %}
+      </div>
+
+      <!-- Upload -->
+      <div class="action-row">
+        <button class="btn btn-success" onclick="step4Upload('{{ project.id }}')">
+          &#8593; Upload to YouTube
+        </button>
+      </div>
+    {% endif %}
+  </div><!-- /step4 -->
+
+</div><!-- /project-page -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const PROJECT_ID = "{{ project.id }}";
+  const PROJECT_STATUS = "{{ project.status }}";
+  const TASK_RUNNING = {{ 'true' if project.task.running else 'false' }};
+
+  // Auto-start polling if a task is already running when page loads
+  if (TASK_RUNNING) {
+    startPolling(PROJECT_ID);
+  }
+
+  const SELECTED_CANDIDATES = new Set();
+
+  function toggleCandidate(imagePath, idx) {
+    const card = document.getElementById('cand-' + idx);
+    if (SELECTED_CANDIDATES.has(imagePath)) {
+      SELECTED_CANDIDATES.delete(imagePath);
+      if (card) card.classList.remove('candidate-selected');
+    } else {
+      SELECTED_CANDIDATES.add(imagePath);
+      if (card) card.classList.add('candidate-selected');
+    }
+  }
+
+  function submitSelectedCandidates(pid) {
+    if (!SELECTED_CANDIDATES.size) {
+      alert('Select at least one image first.');
+      return;
+    }
+    const fd = new FormData();
+    const selected = Array.from(SELECTED_CANDIDATES);
+    selected.forEach(p => fd.append('image_paths', p));
+    // Backward-compat for older running server code expecting singular key.
+    fd.append('image_path', selected[0]);
+    fetch(`/project/${pid}/step1/select`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => {
+        if (!j.ok) { alert(j.error || 'Request failed.'); return; }
+        if (j.project_ids && j.project_ids.length > 1) {
+          location.href = '/';
+        } else {
+          location.reload();
+        }
+      });
+  }
+
+  function startStep2(pid) {
+    fetch(`/project/${pid}/step2/start`, { method: 'POST' })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error); } });
+  }
+
+  let SELECTED_TITLE = null;
+
+  var SELECTED_TITLE_POS = 'top';
+
+  function setTitlePos(pos) {
+    SELECTED_TITLE_POS = pos;
+    document.querySelectorAll('.pos-btn').forEach(b => b.classList.remove('pos-btn-active'));
+    var el = document.getElementById('pos-' + pos);
+    if (el) el.classList.add('pos-btn-active');
+  }
+
+  function chooseTitleSuggestion(title, btn) {
+    SELECTED_TITLE = title;
+    document.querySelectorAll('.title-chip').forEach(c => c.classList.remove('title-chip-selected'));
+    if (btn) btn.classList.add('title-chip-selected');
+  }
+
+  function onCustomTitleInput(inp) {
+    if (inp.value.trim()) {
+      SELECTED_TITLE = null;
+      document.querySelectorAll('.title-chip').forEach(c => c.classList.remove('title-chip-selected'));
+    }
+  }
+
+  function startSetTitle(pid) {
+    const customInp = document.getElementById('custom-title-input');
+    const title = (SELECTED_TITLE || (customInp ? customInp.value : '') || '').trim();
+    if (!title) { alert('Pick a suggestion or type a custom title first.'); return; }
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('text_position', SELECTED_TITLE_POS);
+    fetch(`/project/${pid}/step1/set-title`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error); } });
+  }
+
+  function redoThumbnail(pid, currentTitle) {
+    const title = (SELECTED_TITLE || currentTitle || '').trim();
+    if (!title) { alert('No title available.'); return; }
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('text_position', SELECTED_TITLE_POS);
+    fetch(`/project/${pid}/step1/set-title`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error); } });
+  }
+
+  const firstTitleChip = document.querySelector('.title-chip');
+  if (firstTitleChip) {
+    chooseTitleSuggestion(firstTitleChip.textContent.trim(), firstTitleChip);
+  }
+
+  function goBackToStep(pid, n) {
+    fetch(`/project/${pid}/go-back/${n}`, { method: 'POST' })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error || 'Could not go back.'); } });
+  }
+
+  function approveStep2(pid, slot) {
+    const fd = new FormData();
+    fd.append('slot', slot);
+    fetch(`/project/${pid}/step2/approve`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert('Error: ' + (j.error || 'Unknown')); } });
+  }
+
+  function startStep2Regen(pid) {
+    fetch(`/project/${pid}/step2/regenerate`, { method: 'POST' })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error); } });
+  }
+
+  function regenSlot(pid, slot) {
+    const modelEl = document.getElementById(`slot-${slot}-model`);
+    const model   = modelEl ? modelEl.value : (slot === 'a' ? 'seedance_lite' : 'seedance_pro');
+    const fd = new FormData();
+    fd.append('model', model);
+    fetch(`/project/${pid}/step2/slot/${slot}`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => {
+        if (j.ok) { location.reload(); }
+        else { alert('Could not regenerate: ' + (j.error || 'Unknown error') + '\n\nIf a task is still running, wait for it to finish first.'); }
+      });
+  }
+
+  function startSuno(pid) {
+    const prompt = document.getElementById('suno-prompt').value.trim();
+    if (!prompt) { alert('Enter a music style first.'); return; }
+    const fd = new FormData();
+    fd.append('suno_prompt', prompt);
+    fetch(`/project/${pid}/step2b/start`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error); } });
+  }
+
+  function startStep3(pid) {
+    const form = document.getElementById('step3-form');
+    const data = new FormData(form);
+    data.set('overlay', form.querySelector('#overlay').checked ? 'true' : 'false');
+
+    fetch(`/project/${pid}/step3/start`, { method: 'POST', body: data })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error); } });
+  }
+
+  function proceedToStep4(pid) {
+    fetch(`/project/${pid}/step3/approve`, { method: 'POST' })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error || 'Could not proceed.'); } });
+  }
+
+  // ── Step 4 — SEO & Upload ─────────────────────────────────────────────────
+
+  function step4GenerateSeo(pid) {
+    fetch(`/project/${pid}/step4/generate-seo`, { method: 'POST' })
+      .then(r => r.json())
+      .then(j => {
+        if (j.ok) { startPolling(pid); location.reload(); }
+        else { alert(j.error || 'Could not generate SEO.'); }
+      });
+  }
+
+  function step4SaveSeo(pid) {
+    const fd = new FormData();
+    fd.append('seo_title',       document.getElementById('step4-seo-title').value);
+    fd.append('seo_description', document.getElementById('step4-seo-desc').value);
+    fd.append('seo_tags',        document.getElementById('step4-seo-tags').value);
+    fetch(`/project/${pid}/step4/save-seo`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => { if (!j.ok) { alert(j.error || 'Save failed.'); } });
+  }
+
+  function step4SetPublishTime(pid) {
+    const raw = document.getElementById('step4-publish-at').value.trim();
+    const val = raw ? raw.slice(0, 16) + ':00Z' : '';
+    const fd = new FormData();
+    fd.append('publish_at', val);
+    fetch(`/project/${pid}/step4/set-publish-time`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => {
+        if (j.ok) { location.reload(); }
+        else { alert(j.error || 'Could not set publish time.'); }
+      });
+  }
+
+  function step4ClearPublishTime(pid) {
+    const fd = new FormData();
+    fd.append('publish_at', '');
+    fetch(`/project/${pid}/step4/set-publish-time`, { method: 'POST', body: fd })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } });
+  }
+
+  function step4Upload(pid) {
+    const raw = (document.getElementById('step4-publish-at') || {}).value || '';
+    if (!raw.trim()) {
+      if (!confirm('No publish time is set.\n\nThis video will go LIVE on YouTube immediately (public).\n\nContinue?')) return;
+      fetch(`/project/${pid}/step4/upload`, { method: 'POST' })
+        .then(r => r.json())
+        .then(j => {
+          if (j.ok) { startPolling(pid); location.reload(); }
+          else { alert(j.error || 'Upload failed.'); }
+        });
+    } else {
+      if (!confirm('Upload this video to YouTube?\n\nIt will be scheduled as private and go live at the selected time.')) return;
+      const fd = new FormData();
+      fd.append('publish_at', raw.slice(0, 16) + ':00Z');
+      fetch(`/project/${pid}/step4/set-publish-time`, { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(j => {
+          if (!j.ok) { alert(j.error || 'Could not save publish time.'); return; }
+          fetch(`/project/${pid}/step4/upload`, { method: 'POST' })
+            .then(r => r.json())
+            .then(j2 => {
+              if (j2.ok) { startPolling(pid); location.reload(); }
+              else { alert(j2.error || 'Upload failed.'); }
+            });
+        });
+    }
+  }
+</script>
+{% endblock %}
+
+

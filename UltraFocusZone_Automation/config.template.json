@@ -1,0 +1,6 @@
+{
+  "video_duration_minutes": 60,
+  "thumbnail_width": 1280,
+  "thumbnail_height": 720,
+  "check_interval_seconds": 5
+}

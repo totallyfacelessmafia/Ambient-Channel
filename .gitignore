@@ -1,0 +1,62 @@
+# ── Personal data (never commit) ──
+UltraFocusZone_Automation/config.json
+dashboard/users.json
+dashboard/projects.json
+dashboard/channels.json
+dashboard/channel_profile.json
+dashboard/research_cache.json
+dashboard/image_library.json
+dashboard/yt_token*.json
+dashboard/logos/
+dashboard/style_refs/
+
+# ── Generated content ──
+music/
+images/
+Edited Videos/
+raw footage/
+
+# ── Media / Adobe project files ──
+*.mp4
+*.mp3
+*.m4a
+*.wav
+*.gif
+*.aep
+*.mogrt
+*.prproj
+*.prin
+Adobe After Effects Auto-Save/
+Adobe Premiere Pro Auto-Save/
+Adobe Premiere Pro Captured and Generated/
+Adobe Premiere Pro Video Previews/
+Motion Graphics Template Media/
+
+# ── Automation project data / Chrome profiles ──
+UltraFocusZone_Automation/projects/
+UltraFocusZone_Automation/chrome_profile/
+UltraFocusZone_Automation/.venv/
+UltraFocusZone_Automation/debug_suno.py
+UltraFocusZone_Automation/test_*.py
+
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ──
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── Claude ──
+.claude/
