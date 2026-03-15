@@ -9,11 +9,13 @@ echo   ChannelForge — First-Time Setup
 echo  ============================================
 echo.
 
-:: ── Check Python ──
+:: ── Check Python (try python first, then py launcher) ──
 echo  [1/4] Checking Python...
-python --version >nul 2>&1
+set PYTHON=python
+%PYTHON% --version >nul 2>&1
 if errorlevel 1 (
-    py --version >nul 2>&1
+    set PYTHON=py
+    %PYTHON% --version >nul 2>&1
     if errorlevel 1 (
         echo.
         echo  ERROR: Python is not installed.
@@ -24,7 +26,7 @@ if errorlevel 1 (
         exit /b 1
     )
 )
-for /f "tokens=*" %%i in ('python --version 2^>^&1') do echo         %%i
+for /f "tokens=*" %%i in ('%PYTHON% --version 2^>^&1') do echo         %%i
 echo.
 
 :: ── Check FFmpeg ──
@@ -60,11 +62,11 @@ echo.
 echo  [4/4] Installing Python packages...
 echo.
 cd /d "%~dp0"
-pip install -r requirements.txt --quiet
+%PYTHON% -m pip install -r requirements.txt --quiet
 if errorlevel 1 (
     echo.
     echo  WARNING: Some packages may have failed to install.
-    echo  Try running: pip install -r requirements.txt
+    echo  Try running: %PYTHON% -m pip install -r requirements.txt
     echo.
 )
 

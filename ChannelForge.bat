@@ -4,8 +4,21 @@ title ChannelForge
 color 0F
 cd /d "%~dp0"
 
+:: ── Detect Python command (python or py) ──
+set PYTHON=python
+%PYTHON% --version >nul 2>&1
+if errorlevel 1 (
+    set PYTHON=py
+    %PYTHON% --version >nul 2>&1
+    if errorlevel 1 (
+        echo  ERROR: Python not found. Install from https://www.python.org/downloads/
+        pause
+        exit /b 1
+    )
+)
+
 :: ── First-run check: if requirements aren't installed, run setup ──
-python -c "import flask" >nul 2>&1
+%PYTHON% -c "import flask" >nul 2>&1
 if errorlevel 1 (
     echo  First run detected — running setup...
     echo.
@@ -45,7 +58,7 @@ start "" cmd /c "timeout /t 3 /nobreak >nul && start http://localhost:5000"
 
 :: Launch Flask
 cd dashboard
-python app.py
+%PYTHON% app.py
 
 echo.
 echo  Server stopped.
