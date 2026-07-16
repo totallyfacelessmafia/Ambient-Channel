@@ -1,0 +1,20 @@
+# Normalize all text files to LF in the repository.
+# Windows batch/PowerShell scripts stay CRLF — cmd.exe can misparse LF-only
+# batch files (goto labels), and these run on the production Windows box.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets — never normalize
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.mp4 binary
+*.m4a binary
+*.wav binary
+*.ttf binary
+*.otf binary
+*.zip binary
