@@ -144,6 +144,14 @@ def get_auth_status(cid: str = "") -> dict:
 def _get_valid_credentials(cid: str = ""):
     """Load and auto-refresh credentials from the channel token file. Returns None if unavailable."""
     tf = _token_file(cid)
+    if cid and not tf.exists() and _token_file("").exists():
+        # Channels connected before per-channel tokens existed only have the
+        # legacy file — fall back so single-channel setups keep working.
+        # Loudly: uploading channel B's video with the legacy (channel A)
+        # token is exactly the failure this warning exists to expose.
+        print(f"WARNING: no token file for channel {cid!r} — falling back to "
+              f"the legacy yt_token.json account.")
+        tf = _token_file("")
     if not tf.exists():
         return None
     try:

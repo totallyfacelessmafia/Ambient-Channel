@@ -75,6 +75,22 @@ def _log(pid: str, msg: str) -> None:
     state.append_log(pid, f"[{ts}] {msg}")
 
 
+def _record_quality(pid: str, key: str, ok: bool, warning: str | None = None) -> None:
+    """
+    Merge one quality flag into project state, keeping warnings from other
+    stages intact (state.update_project's dict merge is shallow, so writing
+    `warnings` directly would clobber the other stages' entries).
+    """
+    project = state.get_project(pid) or {}
+    q = dict(project.get("quality") or {})
+    warns = [w for w in q.get("warnings", []) if not w.startswith(f"[{key}]")]
+    if not ok and warning:
+        warns.append(f"[{key}] {warning}")
+    q[key] = ok
+    q["warnings"] = warns
+    state.update_project(pid, quality=q)
+
+
 # ---------------------------------------------------------------------------
 # Step 1a — Generate 4 candidate images + title suggestions
 # ---------------------------------------------------------------------------
@@ -123,6 +139,19 @@ def _run_step1(pid: str) -> None:
         _log(pid, "Generating 4 candidate images via fal.ai FLUX Pro…")
         paths = ga.generate_ai_images(prompt, OUTPUT_DIR, slug, count=4)
         state.set_progress(pid, 85)
+
+        # Detect the FLUX Ultra→Pro fallback — reduced-resolution candidates
+        # are the same class of silent degradation as an upscale failure.
+        try:
+            from PIL import Image as _PILImage
+            with _PILImage.open(paths[0]) as _im:
+                _w = _im.width
+            if _w < 2000:
+                _log(pid, f"WARNING: FLUX Ultra fallback — candidates at reduced resolution ({_w}px wide).")
+            _record_quality(pid, "flux_ultra", _w >= 2000,
+                            f"FLUX Ultra fallback — candidates at reduced resolution ({_w}px wide)")
+        except Exception:
+            pass
 
         # Save all candidates to the Image Library so nothing is wasted
         try:
@@ -199,8 +228,20 @@ def _run_step1_select(pid: str, chosen_path: str) -> None:
 
         shutil.copy2(source, raw_path)
 
+        state.set_progress(pid, 15)
+        _log(pid, "Upscaling selected image to a 4K master (AI detail pass)...")
+        try:
+            ga.upscale_image(raw_path)
+            _record_quality(pid, "upscaled_4k", True)
+        except Exception as ue:
+            # Recorded in project state — the task log is transient, and
+            # autopilot's veto notification must flag reduced-quality videos.
+            warn = f"4K upscale failed — assets use original resolution ({ue})"
+            _log(pid, f"WARNING: {warn}")
+            _record_quality(pid, "upscaled_4k", False, warn)
+
         state.set_progress(pid, 40)
-        _log(pid, "Creating 1920x1080 background...")
+        _log(pid, "Creating 1920x1080 background from the 4K master...")
         ga.generate_background(raw_path, bg_path)
 
         state.set_progress(pid, 80)
@@ -761,6 +802,10 @@ def _run_step3(pid: str) -> None:
         if song_count > 0:
             mp3_files = mp3_files[:song_count]
 
+        # Record the actual playlist — SEO chapters must reflect THIS video's
+        # shuffle, not an alphabetical guess at the shared pool.
+        state.update_project(pid, song_config={"songs": [str(p) for p in mp3_files]})
+
         _log(pid, f"Using {len(mp3_files)} tracks from {MUSIC_DIR.name}/")
         _log(pid, f"Output: {final_out.name}")
 
@@ -934,6 +979,7 @@ def _run_step4_upload(pid: str) -> None:
 
         seo         = project.get("seo", {})
         yt          = project.get("youtube", {})
+        cid         = project.get("channel_id", "") or ""
         title       = seo.get("title") or project.get("title") or "Deep Focus Music"
         description = seo.get("description", "")
         tags        = seo.get("tags", [])
@@ -941,6 +987,7 @@ def _run_step4_upload(pid: str) -> None:
         thumbnail   = project["files"].get("thumbnail")
 
         _log(pid, f"Uploading to YouTube: {title[:60]}…")
+        _log(pid, f"Requested channel credentials: {cid or 'default'}")
         if publish_at:
             _log(pid, f"Scheduled for: {publish_at}")
         else:
@@ -971,6 +1018,7 @@ def _run_step4_upload(pid: str) -> None:
             publish_at=publish_at,
             thumbnail_path=thumbnail,
             progress_callback=_progress_cb,
+            cid=cid,
         )
 
         if result["ok"]:
@@ -982,11 +1030,11 @@ def _run_step4_upload(pid: str) -> None:
             # (takes priority over whatever was stored locally)
             confirmed_pub = result.get("publish_at") or ""
             if confirmed_pub:
-                cal_date = confirmed_pub[:10]  # "YYYY-MM-DD" from UTC ISO string
+                cal_date = utc_to_local_date(confirmed_pub)
             else:
                 project = state.get_project(pid)
                 pub_at = (project or {}).get("youtube", {}).get("scheduled_publish_at") or ""
-                cal_date = pub_at[:10] if pub_at else datetime.now().strftime("%Y-%m-%d")
+                cal_date = utc_to_local_date(pub_at) if pub_at else datetime.now().strftime("%Y-%m-%d")
 
             update_kwargs = dict(
                 step=4,
@@ -1081,6 +1129,25 @@ def start_library_generate(prompt: str, count: int = 4) -> None:
 
 
 # ---------------------------------------------------------------------------
+def utc_to_local_date(utc_iso: str) -> str:
+    """
+    Convert a genuine-UTC ISO string to the local calendar day (YYYY-MM-DD).
+
+    The dashboard runs on the user's own machine, so the server-local day is
+    the day they see in the browser — truncating the UTC string instead puts
+    evening schedules on the wrong calendar day.
+    """
+    from datetime import timezone
+
+    try:
+        dt = datetime.fromisoformat(utc_iso.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone().date().isoformat()
+    except ValueError:
+        return utc_iso[:10]
+
+
 def suggest_next_slot() -> str:
     """
     Return an ISO 8601 UTC datetime string for the next sensible publish slot:

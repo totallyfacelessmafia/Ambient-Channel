@@ -126,8 +126,8 @@
     // Footer: schedule date + YouTube link
     out += '<div class="panel-summary-footer">';
     if (yt.scheduled_publish_at) {
-      // Strip Z/timezone suffix so the datetime is treated as local (not UTC)
-      var pubD = new Date(yt.scheduled_publish_at.replace('Z', '').replace(/[+-]\d{2}:\d{2}$/, ''));
+      // Stored value is genuine UTC — parse as-is, display in local time
+      var pubD = new Date(yt.scheduled_publish_at);
       out += '<span>&#128197; ' + pubD.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '</span>';
     }
     if (yt.video_url) {
@@ -805,8 +805,8 @@
         html += '<button class="btn btn-ghost btn-sm" style="margin-left:8px;font-size:11px" onclick="panelSuggestSlot(\'' + esc(p.id) + '\')">Suggest Slot</button>';
         html += '</div>';
         html += '<div class="panel-schedule-row">';
-        // Convert UTC ISO string to datetime-local value (strip Z)
-        var publishVal = (yt.scheduled_publish_at || '').replace('Z', '').slice(0, 16);
+        // Convert UTC ISO string to local datetime-local value for the input
+        var publishVal = yt.scheduled_publish_at ? utcToLocalInput(yt.scheduled_publish_at) : '';
         html += '<input type="datetime-local" id="panel-publish-at" value="' + esc(publishVal) + '">';
         html += '<button class="btn btn-ghost btn-sm" onclick="panelSetPublishTime(\'' + esc(p.id) + '\')">Set</button>';
         if (yt.scheduled_publish_at) {
@@ -814,7 +814,8 @@
         }
         html += '</div>';
         if (yt.scheduled_publish_at) {
-          html += '<p class="hint" style="font-size:12px;margin-top:4px">Scheduled: ' + esc(yt.scheduled_publish_at) + '</p>';
+          var localStr = new Date(yt.scheduled_publish_at).toLocaleString();
+          html += '<p class="hint" style="font-size:12px;margin-top:4px">Scheduled: ' + esc(localStr) + '</p>';
         } else {
           html += '<p class="hint" style="font-size:12px;margin-top:4px">Leave empty to publish immediately (as public).</p>';
         }
@@ -1143,19 +1144,29 @@
     });
   };
 
+  // Convert a genuine-UTC ISO string to a local "YYYY-MM-DDTHH:MM" value
+  // for <input type="datetime-local">.
+  function utcToLocalInput(iso) {
+    var d = new Date(iso);
+    var pad = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+           'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
   window.panelSuggestSlot = function (pid) {
     fetch('/api/suggest-slot')
       .then(function (r) { return r.json(); })
       .then(function (d) {
         if (!d.ok) return;
+        var localVal = utcToLocalInput(d.slot);   // slot is genuine UTC with Z
         var el = f('panel-publish-at');
         if (el) {
-          el.value = d.slot.replace('Z', '').slice(0, 16);
+          el.value = localVal;
         }
         // Auto-save so the user doesn't have to click "Set" separately
         if (pid) {
-          var val = d.slot; // already UTC ISO with Z
-          post('/project/' + pid + '/step4/set-publish-time', { publish_at: val })
+          post('/project/' + pid + '/step4/set-publish-time',
+               { publish_at: d.slot, local_date: localVal.slice(0, 10) })
             .then(function (j) { if (j.ok) { loadPanel(); } });
         }
       });
@@ -1164,9 +1175,15 @@
   window.panelSetPublishTime = function (pid) {
     var el = f('panel-publish-at');
     if (!el) return;
-    // Convert datetime-local back to UTC ISO (append Z)
-    var val = el.value ? el.value + ':00Z' : '';
-    post('/project/' + pid + '/step4/set-publish-time', { publish_at: val })
+    // Convert local datetime to UTC ISO string; local_date keeps the calendar
+    // chip on the user's wall-clock day (UTC date can differ in the evening).
+    var val = '';
+    var localDate = '';
+    if (el.value) {
+      val = new Date(el.value).toISOString();  // proper local→UTC conversion
+      localDate = el.value.slice(0, 10);
+    }
+    post('/project/' + pid + '/step4/set-publish-time', { publish_at: val, local_date: localDate })
       .then(function (j) {
         if (!j.ok) { alert(j.error); }
         else { loadPanel(); }
@@ -1216,8 +1233,8 @@
     } else {
       // Auto-save the current publish time before uploading
       if (!confirm('Upload this video to YouTube now?\n\nIt will be scheduled as private and go live at the selected time.')) return;
-      var val = raw.slice(0, 16) + ':00Z';  // ensure "YYYY-MM-DDTHH:MM:00Z"
-      post('/project/' + pid + '/step4/set-publish-time', { publish_at: val })
+      var val = new Date(raw).toISOString();  // local→UTC conversion
+      post('/project/' + pid + '/step4/set-publish-time', { publish_at: val, local_date: raw.slice(0, 10) })
         .then(function (j) {
           if (!j.ok) { alert(j.error || 'Could not save publish time.'); return; }
           post('/project/' + pid + '/step4/upload').then(function (j2) {

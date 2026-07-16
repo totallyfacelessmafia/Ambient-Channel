@@ -599,7 +599,7 @@
         {% endif %}
         {% if yt.scheduled_publish_at %}
         <p style="font-size:13px; color:var(--muted); margin-top:4px">
-          Scheduled: {{ yt.scheduled_publish_at }}</p>
+          Scheduled: <span class="js-utc-local" data-utc="{{ yt.scheduled_publish_at }}">{{ yt.scheduled_publish_at }}</span></p>
         {% endif %}
       </div>
 
@@ -645,8 +645,8 @@
       <div style="margin-bottom:20px">
         <h3 style="font-size:15px; font-weight:600; margin-bottom:8px">Publish Schedule</h3>
         <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap">
-          {% set pub_val = (yt.scheduled_publish_at or '')[:16] %}
-          <input type="datetime-local" id="step4-publish-at" value="{{ pub_val }}"
+          <input type="datetime-local" id="step4-publish-at" value=""
+                 data-utc="{{ yt.scheduled_publish_at or '' }}"
                  style="flex:1; min-width:220px">
           <button class="btn btn-ghost btn-sm" onclick="step4SetPublishTime('{{ project.id }}')">Set</button>
           {% if yt.scheduled_publish_at %}
@@ -654,7 +654,7 @@
           {% endif %}
         </div>
         {% if yt.scheduled_publish_at %}
-        <p class="hint" style="margin-top:6px">Scheduled: {{ yt.scheduled_publish_at }}</p>
+        <p class="hint" style="margin-top:6px">Scheduled: <span class="js-utc-local" data-utc="{{ yt.scheduled_publish_at }}">{{ yt.scheduled_publish_at }}</span></p>
         {% else %}
         <p class="hint" style="margin-top:6px">Leave empty to publish immediately as public.</p>
         {% endif %}
@@ -858,9 +858,11 @@
 
   function step4SetPublishTime(pid) {
     const raw = document.getElementById('step4-publish-at').value.trim();
-    const val = raw ? raw.slice(0, 16) + ':00Z' : '';
+    // The input value is local wall time — convert to genuine UTC for storage.
+    const val = raw ? new Date(raw).toISOString() : '';
     const fd = new FormData();
     fd.append('publish_at', val);
+    if (raw) fd.append('local_date', raw.slice(0, 10));
     fetch(`/project/${pid}/step4/set-publish-time`, { method: 'POST', body: fd })
       .then(r => r.json())
       .then(j => {
@@ -890,7 +892,8 @@
     } else {
       if (!confirm('Upload this video to YouTube?\n\nIt will be scheduled as private and go live at the selected time.')) return;
       const fd = new FormData();
-      fd.append('publish_at', raw.slice(0, 16) + ':00Z');
+      fd.append('publish_at', new Date(raw).toISOString());
+      fd.append('local_date', raw.slice(0, 10));
       fetch(`/project/${pid}/step4/set-publish-time`, { method: 'POST', body: fd })
         .then(r => r.json())
         .then(j => {
@@ -903,6 +906,26 @@
             });
         });
     }
+  }
+
+  // ── Stored publish times are genuine UTC; render and edit in local time ──
+  function utcToLocalInput(iso) {
+    const d = new Date(iso);
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+           'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  function initPublishTimeUI() {
+    const el = document.getElementById('step4-publish-at');
+    if (el && el.dataset.utc) el.value = utcToLocalInput(el.dataset.utc);
+    document.querySelectorAll('.js-utc-local').forEach(s => {
+      if (s.dataset.utc) s.textContent = new Date(s.dataset.utc).toLocaleString();
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initPublishTimeUI);
+  } else {
+    initPublishTimeUI();
   }
 </script>
 {% endblock %}

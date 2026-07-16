@@ -51,7 +51,9 @@ PROMPT_STYLE = (
     ", ultra-modern minimalist home office with floor-to-ceiling glass walls, "
     "dramatic ocean cliffs or mountain coastline visible through windows, "
     "dark moody cinematic lighting with deep teal and blue tones, "
-    "luxury architectural interior photography, photorealistic, "
+    "luxury architectural interior photography, photorealistic, hyperrealistic, "
+    "shot on a high-end full-frame cinema camera, razor-sharp focus, "
+    "intricate material textures, high dynamic range, "
     "no people, ultra-detailed, 8K"
 )
 
@@ -76,9 +78,7 @@ def load_fal_key() -> str:
     key = os.environ.get("FAL_KEY", "")
     if key:
         return key
-    print("ERROR: fal API key not set.")
-    print("  -> Edit config.json and set  fal.api_key")
-    sys.exit(1)
+    raise RuntimeError("fal API key not set — edit config.json and set fal.api_key")
 
 
 def load_font(filename: str, size: int) -> ImageFont.FreeTypeFont:
@@ -102,35 +102,64 @@ def smart_crop(img: Image.Image, target_w: int, target_h: int) -> Image.Image:
 
 
 # ---------------------------------------------------------------------------
-# Step 1: AI image generation via fal.ai FLUX Pro
+# Step 1: AI image generation via fal.ai FLUX 1.1 Pro Ultra (native ~2752x1536)
 # ---------------------------------------------------------------------------
 
-def generate_ai_image(prompt: str, output_path: Path) -> None:
-    """Call fal.ai FLUX Pro and save the result to output_path."""
+def _flux_generate(full_prompt: str, count: int) -> list[dict]:
+    """
+    Generate images on FLUX 1.1 Pro Ultra (native ~2752x1536 at 16:9).
+    Falls back to classic FLUX Pro (~1344x768) if the ultra endpoint fails.
+    """
     import fal_client
 
+    try:
+        result = _fal_call(
+            lambda: fal_client.run(
+                "fal-ai/flux-pro/v1.1-ultra",
+                arguments={
+                    "prompt":           full_prompt,
+                    "aspect_ratio":     "16:9",
+                    "num_images":       count,
+                    "safety_tolerance": "6",
+                    "output_format":    "jpeg",
+                },
+            ),
+            "FLUX Ultra generation", timeout_sec=300,
+        )
+        images = result.get("images") or []
+        if images:
+            return images
+        print("  WARNING: FLUX Ultra returned no images — falling back to FLUX Pro.")
+    except Exception as exc:
+        print(f"  WARNING: FLUX Ultra failed ({exc}) — falling back to FLUX Pro.")
+
+    result = _fal_call(
+        lambda: fal_client.run(
+            "fal-ai/flux-pro",
+            arguments={
+                "prompt":           full_prompt,
+                "image_size":       "landscape_16_9",   # ~1344x768, native 16:9
+                "num_images":       count,
+                "safety_tolerance": "6",
+                "output_format":    "jpeg",
+            },
+        ),
+        "FLUX Pro generation", timeout_sec=300,
+    )
+    return result.get("images") or []
+
+
+def generate_ai_image(prompt: str, output_path: Path) -> None:
+    """Generate one image via fal.ai FLUX and save the result to output_path."""
     os.environ["FAL_KEY"] = load_fal_key()
 
     full_prompt = prompt + PROMPT_STYLE
     print(f"  Prompt     : {full_prompt[:100]}...")
-    print("  Generating via fal.ai FLUX Pro...")
+    print("  Generating via fal.ai FLUX 1.1 Pro Ultra...")
 
-    result = fal_client.run(
-        "fal-ai/flux-pro",
-        arguments={
-            "prompt":           full_prompt,
-            "image_size":       "landscape_16_9",   # ~1344x768, native 16:9
-            "num_images":       1,
-            "safety_tolerance": "6",
-            "output_format":    "jpeg",
-        },
-    )
-
-    images = result.get("images") or []
+    images = _flux_generate(full_prompt, 1)
     if not images:
-        print("ERROR: fal.ai returned no images.")
-        print(result)
-        sys.exit(1)
+        raise RuntimeError("fal.ai returned no images.")
 
     urllib.request.urlretrieve(images[0]["url"], str(output_path))
     print(f"  Raw image  : {output_path.name}")
@@ -138,34 +167,19 @@ def generate_ai_image(prompt: str, output_path: Path) -> None:
 
 def generate_ai_images(prompt: str, out_dir: Path, slug: str, count: int = 5) -> list[Path]:
     """
-    Generate `count` candidate images via fal.ai FLUX Pro in a single API call.
+    Generate `count` candidate images via fal.ai FLUX in a single API call.
     Saves them as <slug>_candidate_1.jpg … <slug>_candidate_N.jpg.
     Returns the list of saved Paths.
     """
-    import fal_client
-
     os.environ["FAL_KEY"] = load_fal_key()
 
     full_prompt = prompt + PROMPT_STYLE
     print(f"  Prompt     : {full_prompt[:100]}...")
-    print(f"  Generating {count} images via fal.ai FLUX Pro...")
+    print(f"  Generating {count} images via fal.ai FLUX 1.1 Pro Ultra...")
 
-    result = fal_client.run(
-        "fal-ai/flux-pro",
-        arguments={
-            "prompt":           full_prompt,
-            "image_size":       "landscape_16_9",
-            "num_images":       count,
-            "safety_tolerance": "6",
-            "output_format":    "jpeg",
-        },
-    )
-
-    images = result.get("images") or []
+    images = _flux_generate(full_prompt, count)
     if not images:
-        print("ERROR: fal.ai returned no images.")
-        print(result)
-        sys.exit(1)
+        raise RuntimeError("fal.ai returned no images.")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
@@ -179,10 +193,198 @@ def generate_ai_images(prompt: str, out_dir: Path, slug: str, count: int = 5) ->
 
 
 # ---------------------------------------------------------------------------
+# Step 1b: AI 4K upscale of the selected image (fal.ai)
+# ---------------------------------------------------------------------------
+
+UPSCALE_TARGET_W      = 3840   # aim for a 4K-wide master
+UPSCALE_TIMEOUT_SEC   = 300    # per fal.ai call — a stalled connection must
+                               # not wedge the dashboard worker thread
+UPSCALE_DL_TIMEOUT    = 180    # result download
+
+
+def _first_image_url(result: dict) -> str:
+    img = result.get("image")
+    if isinstance(img, dict) and img.get("url"):
+        return img["url"]
+    images = result.get("images") or []
+    if images and isinstance(images[0], dict):
+        return images[0].get("url") or ""
+    return ""
+
+
+def _call_with_timeout(fn, timeout_sec: int, label: str):
+    """
+    Run fn() with a hard timeout (fal_client exposes none of its own).
+
+    Uses a daemon thread — ThreadPoolExecutor workers are non-daemon and get
+    joined at interpreter exit, so a truly hung call would block server
+    shutdown, which is the exact scenario this timeout exists for.
+    """
+    import threading
+
+    result: list = []
+    error: list = []
+
+    def _target():
+        try:
+            result.append(fn())
+        except BaseException as exc:
+            error.append(exc)
+
+    t = threading.Thread(target=_target, daemon=True, name=f"timeout-{label}")
+    t.start()
+    t.join(timeout_sec)
+    if t.is_alive():
+        raise RuntimeError(f"{label} timed out after {timeout_sec}s")
+    if error:
+        raise error[0]
+    return result[0]
+
+
+FAL_RETRY_ATTEMPTS = 3
+
+# Markers must be phrases, not bare words: "502 Bad Gateway from load
+# balancer" contains "balance" and "429 resource exhausted" contains
+# "exhausted" — both are transient and MUST be retried.
+_BILLING_MARKERS = ("exhausted balance", "insufficient")
+_AUTH_MARKERS    = ("unauthorized", "forbidden", "invalid api key", "api key not set")
+
+
+def _is_billing_error(msg: str) -> bool:
+    m = msg.lower()
+    return any(b in m for b in _BILLING_MARKERS)
+
+
+def _non_retryable(msg: str) -> bool:
+    m = msg.lower()
+    return _is_billing_error(m) or any(a in m for a in _AUTH_MARKERS)
+
+
+def _fal_call(fn, label: str, timeout_sec: int, attempts: int = FAL_RETRY_ATTEMPTS):
+    """
+    Run a fal.ai call with a hard timeout and exponential-backoff retries.
+
+    Transient failures (network blips, 5xx, timeouts) are retried; billing and
+    auth errors are raised immediately — retrying can't fix those and each
+    generation retry bills again.
+    """
+    import time
+
+    last: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return _call_with_timeout(fn, timeout_sec, label)
+        except Exception as exc:
+            if _non_retryable(str(exc)):
+                raise
+            last = exc
+            if attempt < attempts:
+                wait = 5 * 2 ** (attempt - 1)
+                print(f"  WARNING: {label} failed ({exc}) — retrying in {wait}s "
+                      f"(attempt {attempt}/{attempts})...")
+                time.sleep(wait)
+    raise RuntimeError(f"{label} failed after {attempts} attempts: {last}") from last
+
+
+def upscale_image(source: Path, output: Path | None = None) -> Path:
+    """
+    Upscale `source` to a ~4K master with AI detail enhancement.
+
+    Tries Clarity Upscaler first (diffusion-based — re-adds photorealistic
+    texture, not just pixels), then AuraSR (faithful 4x GAN) as fallback.
+    The result is re-encoded as a real JPEG capped at 4K width and written
+    via temp-file-then-rename, so a failure can never corrupt `source`.
+    Overwrites `source` in place when `output` is None.
+    Raises RuntimeError if both upscalers fail.
+    """
+    import shutil
+
+    output = output or source
+
+    with Image.open(source) as im:
+        src_w, src_h = im.size
+
+    if src_w >= UPSCALE_TARGET_W:
+        print(f"  Upscale    : skipped — source already {src_w}x{src_h}")
+        if output != source:
+            shutil.copy2(source, output)
+        return output
+
+    import fal_client
+
+    os.environ["FAL_KEY"] = load_fal_key()
+
+    # Smallest integer factor (2-4) that reaches the 4K target width.
+    factor = min(4, max(2, (UPSCALE_TARGET_W + src_w - 1) // src_w))
+    source_url = _fal_call(
+        lambda: fal_client.upload_file(str(source)), "fal.ai upload",
+        timeout_sec=UPSCALE_DL_TIMEOUT,
+    )
+
+    result_url = ""
+    try:
+        print(f"  Upscaling {factor}x via Clarity (AI detail enhancement)...")
+        result = _fal_call(
+            lambda: fal_client.run(
+                "fal-ai/clarity-upscaler",
+                arguments={
+                    "image_url":      source_url,
+                    "upscale_factor": factor,
+                    "creativity":     0.30,   # add texture without repainting the scene
+                    "resemblance":    0.75,
+                },
+            ),
+            "Clarity upscale", timeout_sec=UPSCALE_TIMEOUT_SEC, attempts=2,
+        )
+        result_url = _first_image_url(result)
+    except Exception as exc:
+        print(f"  WARNING: Clarity upscaler failed ({exc}) — trying AuraSR...")
+
+    if not result_url:
+        result = _fal_call(
+            lambda: fal_client.run("fal-ai/aura-sr", arguments={"image_url": source_url}),
+            "AuraSR upscale", timeout_sec=UPSCALE_TIMEOUT_SEC, attempts=2,
+        )
+        result_url = _first_image_url(result)
+
+    if not result_url:
+        raise RuntimeError("Upscale failed: fal.ai upscalers returned no image.")
+
+    # Download to a temp file, re-encode as a true JPEG capped at 4K width
+    # (AuraSR's fixed 4x can return far larger; Clarity may return PNG bytes),
+    # then atomically replace the destination.
+    tmp_raw = output.with_name(output.name + ".upscale_dl")
+    tmp_jpg = output.with_name(output.name + ".upscale_tmp.jpg")
+    try:
+        with urllib.request.urlopen(result_url, timeout=UPSCALE_DL_TIMEOUT) as resp, \
+             open(tmp_raw, "wb") as fh:
+            shutil.copyfileobj(resp, fh)
+
+        with Image.open(tmp_raw) as im:
+            im = im.convert("RGB")
+            if im.width > UPSCALE_TARGET_W:
+                new_h = round(im.height * UPSCALE_TARGET_W / im.width)
+                im = im.resize((UPSCALE_TARGET_W, new_h), Image.LANCZOS)
+            out_w, out_h = im.size
+            im.save(str(tmp_jpg), "JPEG", quality=95, subsampling=0)
+
+        os.replace(tmp_jpg, output)
+    finally:
+        tmp_raw.unlink(missing_ok=True)
+        tmp_jpg.unlink(missing_ok=True)
+
+    print(f"  Upscaled   : {output.name}  ({src_w}x{src_h} -> {out_w}x{out_h})")
+    return output
+
+
+# ---------------------------------------------------------------------------
 # Step 2: Background frame (1920x1080 — clean, no text)
 # ---------------------------------------------------------------------------
 
 def generate_background(source: Path, output: Path) -> None:
+    # 1920x1080 on purpose: every encode path outputs 1080p, and the animation
+    # APIs cap upload size — a 4K PNG here is pure cost. The 4K master (raw
+    # image) is what feeds the thumbnail.
     img = Image.open(source).convert("RGB")
     bg  = smart_crop(img, BG_W, BG_H)
     bg.save(str(output), "PNG")
@@ -198,11 +400,16 @@ def generate_thumbnail(source: Path, title: str, output: Path, text_position: st
     Minimal thumbnail: full atmospheric image + centered Montserrat text.
     Supports text placement (top/middle/bottom) and adds subtle readability
     styling for bright backgrounds.
+
+    Composited at 2x (2560x1440) and downsampled to 1280x720 so both the image
+    detail and the text anti-aliasing stay crisp, then saved as a JPEG under
+    YouTube's 2 MB thumbnail limit.
     """
-    W, H = THUMB_W, THUMB_H
+    SS = 2                              # supersampling factor
+    W, H = THUMB_W * SS, THUMB_H * SS
 
     base = smart_crop(Image.open(source).convert("RGBA"), W, H)
-    font = load_font("Montserrat-Regular.ttf", 120)
+    font = load_font("Montserrat-Regular.ttf", 120 * SS)
     draw = ImageDraw.Draw(base)
 
     bbox = draw.textbbox((0, 0), title, font=font)
@@ -219,11 +426,19 @@ def generate_thumbnail(source: Path, title: str, output: Path, text_position: st
 
     # Keep original clean style: no rectangle backing, only subtle legibility aids.
     # Thin stroke + gentle drop shadow for legibility without looking heavy.
-    draw.text((x + 2, y + 2), title, font=font, fill=(0, 0, 0, 110))
-    draw.text((x, y), title, font=font, fill=WHITE, stroke_width=2, stroke_fill=(10, 16, 28, 190))
+    draw.text((x + 2 * SS, y + 2 * SS), title, font=font, fill=(0, 0, 0, 110))
+    draw.text((x, y), title, font=font, fill=WHITE, stroke_width=2 * SS, stroke_fill=(10, 16, 28, 190))
 
-    base.convert("RGB").save(str(output), "JPEG", quality=97, subsampling=0)
-    print(f"  Thumbnail  : {output.name}  ({W}x{H})")
+    final = base.resize((THUMB_W, THUMB_H), Image.LANCZOS).convert("RGB")
+
+    # YouTube rejects thumbnails over 2 MB — step quality down until it fits.
+    for quality in (95, 92, 88, 84, 80):
+        final.save(str(output), "JPEG", quality=quality, subsampling=0)
+        if output.stat().st_size <= 2 * 1024 * 1024:
+            break
+
+    size_kb = output.stat().st_size // 1024
+    print(f"  Thumbnail  : {output.name}  ({THUMB_W}x{THUMB_H}, {size_kb} KB)")
 
 
 # ---------------------------------------------------------------------------
@@ -258,9 +473,8 @@ def generate_loop_video(source: Path, output: Path, duration: int = 30) -> None:
         cmd += ["-crf", "21", "-preset", "slow"]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            print("ERROR generating loop video:")
             print(result.stderr[:2000])
-            sys.exit(1)
+            raise RuntimeError("FFmpeg failed while generating the loop video.")
     print(f"  Loop video : {output.name}  ({duration}s, loops seamlessly)")
 
 
@@ -324,9 +538,8 @@ def generate_ambient_loop(source: Path, output: Path, duration: int = 30) -> Non
                 capture_output=True, text=True,
             )
             if result.returncode != 0:
-                print("ERROR generating ambient loop:")
                 print(result.stderr[:2000])
-                sys.exit(1)
+                raise RuntimeError("FFmpeg failed while generating the ambient loop.")
 
         print(f"  Ambient loop: {output.name}  ({duration}s, zero camera movement)")
 
@@ -538,7 +751,10 @@ def generate_animated_loop_ai(
 
     # Upload the source image to fal.ai storage so the model can read it
     print(f"  Uploading image to fal.ai for {cfg['label']}...")
-    image_url = fal_client.upload_file(str(source))
+    image_url = _fal_call(
+        lambda: fal_client.upload_file(str(source)), "fal.ai image upload",
+        timeout_sec=180,
+    )
 
     arguments = {
         "image_url": image_url,
@@ -555,12 +771,15 @@ def generate_animated_loop_ai(
 
     print(f"  Animating with {cfg['label']}...")
     try:
-        result = fal_client.run(cfg["endpoint"], arguments=arguments)
+        result = _fal_call(
+            lambda: fal_client.run(cfg["endpoint"], arguments=arguments),
+            f"{cfg['label']} animation", timeout_sec=900, attempts=2,
+        )
     except Exception as e:
         msg = str(e)
-        if "balance" in msg.lower() or "exhausted" in msg.lower():
+        if _is_billing_error(msg):
             raise RuntimeError(
-                f"fal.ai balance exhausted. Top up at: fal.ai/dashboard/billing"
+                "fal.ai balance exhausted. Top up at: fal.ai/dashboard/billing"
             ) from e
         raise RuntimeError(f"{cfg['label']} animation failed: {msg}") from e
 
@@ -614,7 +833,6 @@ def generate_music_beatoven(
     import urllib.request
     import tempfile
     import subprocess
-    import concurrent.futures
 
     os.environ["FAL_KEY"] = load_fal_key()
 
@@ -629,12 +847,12 @@ def generate_music_beatoven(
         arguments["seed"] = seed
 
     print(f"  Generating track via Beatoven ({duration}s, seed={seed})...")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as _ex:
-        _fut = _ex.submit(fal_client.run, "beatoven/music-generation", arguments=arguments)
-        try:
-            result = _fut.result(timeout=300)  # 5-minute hard timeout
-        except concurrent.futures.TimeoutError:
-            raise RuntimeError("Beatoven API timed out after 5 minutes")
+    # _fal_call, not a `with ThreadPoolExecutor`: the with-block joins a hung
+    # worker on exit, so its "hard timeout" never actually released the thread.
+    result = _fal_call(
+        lambda: fal_client.run("beatoven/music-generation", arguments=arguments),
+        "Beatoven generation", timeout_sec=300, attempts=2,
+    )
 
     audio_url = (result.get("audio") or {}).get("url", "")
     if not audio_url:
@@ -678,7 +896,6 @@ def generate_music_stable_audio(
     import urllib.request
     import tempfile
     import subprocess
-    import concurrent.futures
 
     os.environ["FAL_KEY"] = load_fal_key()
 
@@ -692,12 +909,10 @@ def generate_music_stable_audio(
         arguments["seed"] = seed
 
     print(f"  Generating track via Stable Audio ({duration}s, seed={seed})...")
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-        fut = ex.submit(fal_client.run, "fal-ai/stable-audio", arguments=arguments)
-        try:
-            result = fut.result(timeout=360)
-        except concurrent.futures.TimeoutError:
-            raise RuntimeError("Stable Audio API timed out after 6 minutes")
+    result = _fal_call(
+        lambda: fal_client.run("fal-ai/stable-audio", arguments=arguments),
+        "Stable Audio generation", timeout_sec=360, attempts=2,
+    )
 
     audio_url = (result.get("audio_file") or {}).get("url", "")
     if not audio_url:
@@ -761,9 +976,8 @@ def _apply_crossfade_loop(raw_clip: Path, output: Path, clip_duration: int) -> N
             capture_output=True, text=True,
         )
         if result.returncode != 0:
-            print("ERROR applying crossfade dissolve:")
             print(result.stderr[:2000])
-            sys.exit(1)
+            raise RuntimeError("FFmpeg failed while applying the crossfade dissolve.")
 
 
 def _make_loop30(loop_clip: Path, output: Path) -> None:
@@ -788,9 +1002,8 @@ def _make_loop30(loop_clip: Path, output: Path) -> None:
             capture_output=True, text=True,
         )
         if result.returncode != 0:
-            print("ERROR building 30-second loop:")
             print(result.stderr[:2000])
-            sys.exit(1)
+            raise RuntimeError("FFmpeg failed while building the 30-second loop.")
 
 
 def generate_animated_loop(
@@ -813,34 +1026,38 @@ def generate_animated_loop(
 
     # Upload the source image to fal.ai's storage so Kling can read it
     print("  Uploading image to fal.ai...")
-    image_url = fal_client.upload_file(str(source))
+    image_url = _fal_call(
+        lambda: fal_client.upload_file(str(source)), "fal.ai image upload",
+        timeout_sec=180,
+    )
 
     print(f"  Animating with Kling v1.6 ({duration}s)...")
     try:
-        result = fal_client.run(
-            "fal-ai/kling-video/v1.6/standard/image-to-video",
-            arguments={
-                "image_url":       image_url,
-                "prompt":          motion_prompt,
-                "negative_prompt": KLING_NEGATIVE_PROMPT,
-                "duration":        duration,      # "5" or "10"
-                "aspect_ratio":    "16:9",
-            },
+        result = _fal_call(
+            lambda: fal_client.run(
+                "fal-ai/kling-video/v1.6/standard/image-to-video",
+                arguments={
+                    "image_url":       image_url,
+                    "prompt":          motion_prompt,
+                    "negative_prompt": KLING_NEGATIVE_PROMPT,
+                    "duration":        duration,      # "5" or "10"
+                    "aspect_ratio":    "16:9",
+                },
+            ),
+            "Kling animation", timeout_sec=900, attempts=2,
         )
     except Exception as e:
         msg = str(e)
-        if "Exhausted balance" in msg or "balance" in msg.lower():
-            print("ERROR: fal.ai balance exhausted.")
-            print("  -> Top up at: fal.ai/dashboard/billing")
-        else:
-            print(f"ERROR: Kling animation failed: {msg}")
-        sys.exit(1)
+        if _is_billing_error(msg):
+            raise RuntimeError(
+                "fal.ai balance exhausted — top up at fal.ai/dashboard/billing"
+            ) from e
+        raise RuntimeError(f"Kling animation failed: {msg}") from e
 
     video_url = (result.get("video") or {}).get("url", "")
     if not video_url:
-        print("ERROR: Kling returned no video.")
         print(result)
-        sys.exit(1)
+        raise RuntimeError("Kling returned no video.")
 
     # Download the raw Kling clip
     raw_clip = output.with_name(output.stem + "_raw.mp4")
@@ -962,4 +1179,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)

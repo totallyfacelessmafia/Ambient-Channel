@@ -1056,10 +1056,13 @@ def step4_set_publish_time(pid):
     if project is None:
         return jsonify(ok=False, error="Project not found"), 404
     publish_at = request.form.get("publish_at", "").strip() or None
+    local_date = request.form.get("local_date", "").strip()
     state.update_project(pid, youtube={"scheduled_publish_at": publish_at})
-    # Keep calendar scheduled_date in sync with the YouTube publish date
+    # Keep calendar scheduled_date in sync with the YouTube publish date.
+    # Prefer the client's local calendar day — truncating the UTC string puts
+    # evening schedules on the wrong day.
     if publish_at:
-        cal_date = publish_at[:10]  # "YYYY-MM-DD" from "YYYY-MM-DDTHH:MM"
+        cal_date = local_date or tasks.utc_to_local_date(publish_at)
         state.update_project(pid, scheduled_date=cal_date)
     return jsonify(ok=True)
 
@@ -1088,7 +1091,7 @@ def sync_yt_date(pid):
             return jsonify(ok=False, error="Video not found on YouTube.")
         pub_at = items[0].get("status", {}).get("publishAt", "")
         if pub_at:
-            cal_date = pub_at[:10]
+            cal_date = tasks.utc_to_local_date(pub_at)
             state.update_project(pid, scheduled_date=cal_date,
                                  youtube={"scheduled_publish_at": pub_at})
             return jsonify(ok=True, scheduled_date=cal_date, publish_at=pub_at)

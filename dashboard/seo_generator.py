@@ -198,10 +198,16 @@ def generate_description(project: dict, profile: dict, seo_title: str = None) ->
     lines.append("")
 
     # 5 — Chapters (real ffprobe timestamps)
-    mp3s  = sorted(MUSIC_DIR.glob("*.mp3"))
-    count = project.get("song_config", {}).get("count", 18)
-    if count and count > 0:
-        mp3s = mp3s[:count]
+    # Use the playlist Step 3 recorded — the pool is shuffled per render, so
+    # an alphabetical glob would name tracks that aren't in this video.
+    stored = project.get("song_config", {}).get("songs") or []
+    mp3s = [Path(p) for p in stored if Path(p).exists()]
+    if not mp3s:
+        # Legacy projects rendered before the playlist was recorded
+        mp3s  = sorted(MUSIC_DIR.glob("*.mp3"))
+        count = project.get("song_config", {}).get("count", 18)
+        if count and count > 0:
+            mp3s = mp3s[:count]
 
     if mp3s:
         crossfade = float(project.get("song_config", {}).get("crossfade_sec", 2.0))

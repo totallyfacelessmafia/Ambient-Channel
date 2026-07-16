@@ -30,6 +30,7 @@ Default paths (relative to this script)
 """
 
 import argparse
+import os
 import subprocess
 import sys
 import tempfile
@@ -70,12 +71,19 @@ HAS_NVENC = _has_nvenc()
 # Workaround: use bare filenames (no path) and set FONT_DIR as the working
 # directory for the FFmpeg video-assembly call.  FFmpeg resolves fontfile=
 # relative to its CWD, while all other inputs/outputs use absolute paths.
-FONT_DIR         = "C:/Windows/Fonts"
-# Segoe UI — clean modern sans-serif, ships on all Windows 10/11 systems.
-# Change to e.g. "Nunito-Bold.ttf" / "Nunito-Regular.ttf" after installing
-# a dedicated rounded font (place the .ttf files inside FONT_DIR).
-FONTFILE_BOLD    = "segoeuib.ttf"    # Segoe UI Bold
-FONTFILE_REGULAR = "segoeui.ttf"     # Segoe UI Regular
+if os.name == "nt":
+    FONT_DIR         = "C:/Windows/Fonts"
+    # Segoe UI — clean modern sans-serif, ships on all Windows 10/11 systems.
+    # Change to e.g. "Nunito-Bold.ttf" / "Nunito-Regular.ttf" after installing
+    # a dedicated rounded font (place the .ttf files inside FONT_DIR).
+    FONTFILE_BOLD    = "segoeuib.ttf"    # Segoe UI Bold
+    FONTFILE_REGULAR = "segoeui.ttf"     # Segoe UI Regular
+else:
+    # macOS/Linux: no Windows fonts dir — use the repo's bundled Montserrat
+    # via the same CWD trick so there is a single fontfile= code path.
+    FONT_DIR         = str(Path(__file__).parent / "fonts")
+    FONTFILE_BOLD    = "Montserrat-SemiBold.ttf"
+    FONTFILE_REGULAR = "Montserrat-Regular.ttf"
 
 # Panel position and size
 PX, PY = 40, 905          # panel top-left corner
@@ -120,9 +128,8 @@ def ffprobe_duration(filepath: Path) -> float:
     try:
         return float(result.stdout.strip())
     except ValueError:
-        print(f"ERROR: ffprobe could not read duration of {filepath}")
         print(result.stderr[-1000:])
-        sys.exit(1)
+        raise RuntimeError(f"ffprobe could not read duration of {filepath}")
 
 
 def run_ffmpeg(cmd: list, label: str, cwd: str | None = None):
@@ -139,7 +146,7 @@ def run_ffmpeg(cmd: list, label: str, cwd: str | None = None):
     if result.returncode != 0:
         print("\n  [FFmpeg error — first 4000 chars]")
         print(result.stderr[:4000])
-        sys.exit(1)
+        raise RuntimeError(f"FFmpeg failed: {label}")
 
 
 def format_mmss(seconds: float) -> str:
@@ -703,4 +710,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except RuntimeError as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)
