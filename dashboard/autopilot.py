@@ -185,7 +185,12 @@ def _run_project_inner(pid: str) -> bool:
     project = state.get_project(pid)
     if project is None:
         return False
-    if tasks.is_running(pid):
+    # "Already running" must not match ourselves: start_run_async registers
+    # the autopilot thread under this pid before it starts.
+    with tasks._registry_lock:
+        existing = tasks._active_threads.get(pid)
+    if (existing is not None and existing.is_alive()
+            and existing is not threading.current_thread()):
         tasks._log(pid, "AUTOPILOT: project already has a running task — skipping.")
         return False
 
