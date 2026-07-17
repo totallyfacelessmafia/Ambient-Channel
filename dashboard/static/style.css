@@ -5,8 +5,8 @@
   /* AmbiHub Blue Hour theme (brand board v3): twilight blues, glass panels,
      Signal Teal as the single accent, Lamp Amber for warmth. */
   --bg:        #060B18;                    /* rich navy void          */
-  --surface:   rgba(10, 25, 50, 0.45);     /* semi-transparent glass  */
-  --border:    rgba(255, 255, 255, 0.08);  /* reflective 1px edge     */
+  --surface:   rgba(255, 255, 255, 0.09);  /* light frosted glass     */
+  --border:    rgba(255, 255, 255, 0.12);  /* reflective 1px edge     */
   --text:      #E6ECFA;                    /* Clarity White           */
   --muted:     #93A5CE;                    /* blue-biased muted       */
   --accent:    #4D82FF;                    /* Electric Sapphire       */
@@ -2684,22 +2684,24 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover { opacity:
    With the gradient on <body> itself, the ::before layer renders BEHIND
    the page background and the light field is invisible: panels then have
    nothing to frost and read as 100% opaque. */
+/* Layer 1, the canvas: a real blue-hour scene (our own product's output)
+   behind the whole interface; body paints a translucent darkening gradient
+   over it for legibility; a faint light mesh floats above the photo. */
 html {
-  background: linear-gradient(180deg, #060B18 0%, #0A1530 55%, #102448 100%) fixed;
+  background: #060B18 url("ambient-bg.jpg") center / cover no-repeat fixed;
 }
-body { background: transparent; }
-
-/* Layer 1, the canvas: vibrant mesh of sapphire, royal purple, indigo.
-   This is what bleeds through the 45%-opacity glass above it. */
+body {
+  background: linear-gradient(180deg, rgba(6,11,24,.70) 0%, rgba(8,14,30,.50) 45%, rgba(6,11,24,.78) 100%);
+  background-attachment: fixed;
+}
 body::before {
   content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
   filter: blur(60px);
   background:
-    radial-gradient(circle at 14% 8%,  rgba(61,107,255,.65), transparent 27%),
-    radial-gradient(circle at 85% 22%, rgba(124,92,255,.58), transparent 25%),
-    radial-gradient(circle at 50% 45%, rgba(88,70,255,.50),  transparent 26%),
-    radial-gradient(circle at 45% 96%, rgba(42,120,255,.60), transparent 27%),
-    radial-gradient(circle at 90% 88%, rgba(232,168,92,.34), transparent 18%);
+    radial-gradient(circle at 14% 8%,  rgba(61,107,255,.28), transparent 27%),
+    radial-gradient(circle at 85% 22%, rgba(124,92,255,.24), transparent 25%),
+    radial-gradient(circle at 45% 96%, rgba(42,120,255,.26), transparent 27%),
+    radial-gradient(circle at 90% 88%, rgba(232,168,92,.16), transparent 18%);
 }
 
 .step-panel, .login-card, .project-card, .pipeline-card, .stat-card,
@@ -2714,10 +2716,10 @@ body::before {
   transition: border-color .2s ease, background-color .2s ease;
 }
 .step-panel:hover, .project-card:hover, .pipeline-card:hover, .stat-card:hover {
-  background: rgba(10,25,50,.52);
-  border-top-color: rgba(255,255,255,.22);
+  background: rgba(255,255,255,.13);
+  border-top-color: rgba(255,255,255,.26);
 }
-.navbar { background: rgba(10, 25, 50, 0.62); }
+.navbar { background: rgba(12, 20, 40, 0.55); }
 
 /* Luminous primaries: the one glowing light source per view */
 .btn-primary {
