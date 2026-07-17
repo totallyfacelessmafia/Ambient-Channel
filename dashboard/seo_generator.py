@@ -204,7 +204,7 @@ def generate_description(project: dict, profile: dict, seo_title: str = None) ->
     mp3s = [Path(p) for p in stored if Path(p).exists()]
     if not mp3s:
         # Legacy projects rendered before the playlist was recorded
-        mp3s  = sorted(MUSIC_DIR.glob("*.mp3"))
+        mp3s  = sorted(p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._"))
         count = project.get("song_config", {}).get("count", 18)
         if count and count > 0:
             mp3s = mp3s[:count]

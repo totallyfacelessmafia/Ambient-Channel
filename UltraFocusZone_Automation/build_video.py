@@ -650,7 +650,7 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
 
     # ---- Collect MP3s ----
-    mp3_files = sorted(music_dir.glob("*.mp3"))
+    mp3_files = sorted(p for p in music_dir.glob("*.mp3") if not p.name.startswith("._"))
     if not mp3_files:
         print(f"ERROR: no .mp3 files found in {music_dir}")
         sys.exit(1)

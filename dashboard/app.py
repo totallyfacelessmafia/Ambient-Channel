@@ -726,7 +726,7 @@ def project_detail(pid):
     project = state.get_project(pid)
     if project is None:
         abort(404)
-    song_total = len(list(MUSIC_DIR.glob("*.mp3")))
+    song_total = len([p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._")])
     return render_template("project.html", project=project, song_total=song_total)
 
 
@@ -1516,14 +1516,14 @@ def images_delete():
 @app.route("/api/songs")
 @auth.login_required
 def list_songs():
-    files = sorted(MUSIC_DIR.glob("*.mp3"))
+    files = sorted(p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._"))
     return jsonify(total=len(files), files=[f.name for f in files])
 
 
 @app.route("/api/songs/count")
 @auth.login_required
 def songs_count():
-    return jsonify(total=len(list(MUSIC_DIR.glob("*.mp3"))))
+    return jsonify(total=len([p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._")]))
 
 
 @app.route("/api/songs/<filename>")

@@ -797,7 +797,9 @@ def _run_step3(pid: str) -> None:
         VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
         final_out = VIDEOS_DIR / f"{slug}_1hr.mp4"
 
-        mp3_files = list(MUSIC_DIR.glob("*.mp3"))
+        # Skip macOS AppleDouble sidecars ("._x.mp3") — invisible in Finder/ls
+        # on external volumes but returned by glob, and not real audio.
+        mp3_files = [p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._")]
         random.shuffle(mp3_files)
         if song_count > 0:
             mp3_files = mp3_files[:song_count]
