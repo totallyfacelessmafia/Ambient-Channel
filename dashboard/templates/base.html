@@ -31,7 +31,7 @@
       </div>
       {% endif %}
       <div class="htools">
-        <a class="btn btn-primary btn-sm" href="{{ url_for('new_project_form') }}">+ New Project</a>
+        <button type="button" class="btn btn-primary btn-sm" onclick="newVideo(this)">+ New Video</button>
         <span class="nav-user">{{ session.user }}</span>
         <form method="POST" action="{{ url_for('logout') }}" style="display:inline">
           <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
@@ -81,6 +81,20 @@
       fetch('/channels/switch/' + cid, { method: 'POST' })
         .then(function(r){ return r.json(); })
         .then(function(d){ if (d.ok) location.reload(); });
+    }
+    function newVideo(btn) {
+      if (btn) { btn.disabled = true; btn.textContent = 'Creating…'; }
+      var fd = new FormData();
+      fd.append('use_channel_style', 'true');
+      fd.append('quantity', '4');
+      fetch('/project/new', { method: 'POST', body: fd })
+        .then(function(r){ return r.json(); })
+        .then(function(j){
+          if (j.ok) { location.href = '/project/' + j.pid; }
+          else if (j.redirect) { location.href = j.redirect; }
+          else { alert(j.error || 'Could not create a project.');
+                 if (btn) { btn.disabled = false; btn.textContent = '+ New Video'; } }
+        });
     }
   </script>
   {% else %}

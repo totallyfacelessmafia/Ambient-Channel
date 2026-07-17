@@ -49,17 +49,21 @@
     </main>
 
     <aside class="hv-stack">
-      {% for a in awaiting %}
+      {% if awaiting %}
       <div class="hv-card glass hv-veto">
         <h2>Awaiting Your OK</h2>
-        <div class="hv-vt">{{ a.title }}</div>
-        <div class="hv-vd">Uploaded private · goes live <span class="js-utc-local" data-utc="{{ a.publish_at }}">{{ a.publish_at[:10] }}</span> unless you veto</div>
-        <div class="hv-actions">
-          <a class="hv-sm ok" href="/project/{{ a.id }}">Review</a>
-          <a class="hv-sm no" href="https://youtube.com/watch?v={{ a.id }}" onclick="return false" title="Open the project to preview">Watch First</a>
+        {% for a in awaiting %}
+        <div class="hv-await{% if not loop.first %} hv-await-sep{% endif %}" id="await-{{ a.id }}">
+          <div class="hv-vt">{{ a.title }}</div>
+          <div class="hv-vd">Uploaded private · goes live <span class="js-utc-local" data-utc="{{ a.publish_at }}">{{ a.publish_at[:10] }}</span> unless you cancel.</div>
+          <div class="hv-actions">
+            <a class="hv-sm ok" href="/project/{{ a.id }}">Review &amp; Preview</a>
+            <button class="hv-sm no" onclick="vetoVideo('{{ a.id }}', this)">Keep Private</button>
+          </div>
         </div>
+        {% endfor %}
       </div>
-      {% endfor %}
+      {% endif %}
 
       <div class="hv-card glass">
         <h2>This Week</h2>
@@ -240,13 +244,27 @@ var CHANNEL_OVERLAY_STYLE = {{ (g.active_channel.overlay_style if g.active_chann
 })();
 
 function runNewAutopilot(btn) {
-  if (!confirm('Run Autopilot?\n\nThis creates a new video and makes every decision automatically, then uploads it private with a scheduled publish time you can veto. It spends AI credits. Continue?')) return;
+  if (!confirm('Run Autopilot?\n\nThis creates a new video and makes every decision automatically, then uploads it private with a scheduled publish time you can cancel. It spends AI credits. Continue?')) return;
   btn.disabled = true; btn.textContent = 'Starting…';
   fetch('/autopilot/new', { method: 'POST' })
     .then(function(r){ return r.json(); })
     .then(function(j){
       if (j.ok) { location.href = '/project/' + j.pid; }
+      else if (j.connect_url && confirm((j.error || '') + '\n\nConnect YouTube now?')) { location.href = j.connect_url; }
       else { alert(j.error || 'Could not start autopilot.'); btn.disabled = false; btn.textContent = 'Run Autopilot'; }
+    });
+}
+
+function vetoVideo(pid, btn) {
+  if (!confirm('Keep this video private?\n\nIt will NOT go live at the scheduled time. It stays on your channel as a private draft, so nothing is lost — you can reschedule it later from the project page.')) return;
+  btn.disabled = true; btn.textContent = 'Cancelling…';
+  fetch('/project/' + pid + '/veto', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.ok) {
+        var row = document.getElementById('await-' + pid);
+        if (row) { row.querySelector('.hv-vd').textContent = 'Kept private — will not go live.'; row.querySelector('.hv-actions').remove(); }
+      } else { alert(j.error || 'Could not cancel.'); btn.disabled = false; btn.textContent = 'Keep Private'; }
     });
 }
 

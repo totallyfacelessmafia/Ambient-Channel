@@ -468,8 +468,10 @@
     {% elif project.status == 'done' %}
       <!-- Done -->
       <div class="success-banner">
-        <p>&#10003; Video complete!</p>
+        <p>&#10003; Video complete! Preview it below before you publish.</p>
         {% if project.files.final_video %}
+        <video class="review-player" controls preload="metadata"
+               src="{{ url_for('serve_file', fp=project.files.final_video|basename) }}"></video>
         <p class="final-path">{{ project.files.final_video }}</p>
         {% endif %}
       </div>
@@ -564,7 +566,9 @@
       {% if project.files.final_video %}
       <!-- Video exists from a previous build — pipeline order: build above, proceed below -->
       <div class="success-banner" style="margin-top:20px; margin-bottom:12px">
-        <p>&#10003; A completed video already exists.</p>
+        <p>&#10003; A completed video already exists. Preview it below.</p>
+        <video class="review-player" controls preload="metadata"
+               src="{{ url_for('serve_file', fp=project.files.final_video|basename) }}"></video>
         <p class="final-path">{{ project.files.final_video }}</p>
       </div>
       <div class="action-row" style="flex-wrap:wrap; gap:8px">
@@ -616,14 +620,25 @@
 
     {% elif yt.upload_status == 'done' %}
       <div class="success-banner">
+        {% if yt.scheduled_publish_at %}
+        <p>&#10003; Uploaded as <b>private</b> — scheduled, not yet public. Preview it below.</p>
+        {% else %}
         <p>&#10003; Uploaded to YouTube!</p>
+        {% endif %}
+        {% if project.files.final_video %}
+        <video class="review-player" controls preload="metadata"
+               src="{{ url_for('serve_file', fp=project.files.final_video|basename) }}"></video>
+        {% endif %}
         {% if yt.video_id %}
         <p><a href="https://youtu.be/{{ yt.video_id }}" target="_blank" style="color:var(--success)">
           youtu.be/{{ yt.video_id }}</a></p>
         {% endif %}
         {% if yt.scheduled_publish_at %}
         <p style="font-size:13px; color:var(--muted); margin-top:4px">
-          Scheduled: <span class="js-utc-local" data-utc="{{ yt.scheduled_publish_at }}">{{ yt.scheduled_publish_at }}</span></p>
+          Goes live: <span class="js-utc-local" data-utc="{{ yt.scheduled_publish_at }}">{{ yt.scheduled_publish_at }}</span></p>
+        <div class="action-row" style="margin-top:12px">
+          <button class="btn btn-ghost btn-sm" onclick="vetoFromProject('{{ project.id }}')">Keep Private (cancel scheduled publish)</button>
+        </div>
         {% endif %}
       </div>
 
@@ -876,6 +891,13 @@
           if (btn) { btn.disabled = false; btn.textContent = '⚡ Run Autopilot'; }
         }
       });
+  }
+
+  function vetoFromProject(pid) {
+    if (!confirm('Keep this video private?\n\nIt will NOT go live at the scheduled time. It stays on your channel as a private draft — you can reschedule it later.')) return;
+    fetch(`/project/${pid}/veto`, { method: 'POST' })
+      .then(r => r.json())
+      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error || 'Could not cancel.'); } });
   }
 
   function proceedToStep4(pid) {

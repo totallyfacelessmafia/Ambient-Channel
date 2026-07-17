@@ -177,6 +177,44 @@ def _get_valid_credentials(cid: str = ""):
 
 
 # ---------------------------------------------------------------------------
+# Connection check + veto (cancel a scheduled publish)
+# ---------------------------------------------------------------------------
+
+def is_connected(cid: str = "") -> bool:
+    """True if we hold valid, refreshable YouTube credentials for this channel.
+
+    Used as a pre-flight gate before autopilot spends money on generation:
+    without this, an unconnected client burns a full render and only fails at
+    the upload step.
+    """
+    return _get_valid_credentials(cid) is not None
+
+
+def cancel_scheduled_publish(video_id: str, cid: str = "") -> dict:
+    """
+    Veto a scheduled video: force it back to private and clear its publishAt,
+    so it will NOT go live at the scheduled time. The video stays on the
+    channel as a private draft (not deleted), so nothing is lost.
+
+    Returns {"ok": bool, "error": str|None}.
+    """
+    creds = _get_valid_credentials(cid)
+    if creds is None:
+        return {"ok": False, "error": "YouTube is not connected for this channel."}
+    try:
+        from googleapiclient.discovery import build
+        youtube = build("youtube", "v3", credentials=creds)
+        # publishAt can only be cleared by rewriting the status resource.
+        youtube.videos().update(
+            part="status",
+            body={"id": video_id, "status": {"privacyStatus": "private"}},
+        ).execute()
+        return {"ok": True, "error": None}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
 # Tag sanitizer
 # ---------------------------------------------------------------------------
 

@@ -198,6 +198,15 @@ def _run_project_inner(pid: str) -> bool:
     cid  = project.get("channel_id", "") or ""
     chan = ch.get_channel(cid) or {}
     cfg  = dict(chan.get("autopilot") or {})
+
+    # Pre-flight: don't spend money on generation if the video can't be
+    # uploaded at the end. This also protects the cadence scheduler.
+    import youtube_upload as yu
+    if not yu.is_connected(cid):
+        _fail(pid, "YouTube is not connected for this channel — connect it "
+                   "before autopilot runs (no credits were spent).")
+        return False
+
     state.update_project(pid, autopilot_state="running")
     tasks._log(pid, "AUTOPILOT: starting hands-free run.")
 

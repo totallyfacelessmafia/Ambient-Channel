@@ -2912,3 +2912,11 @@ body:has(.app-frame) { overflow: hidden; }
   .hv-flow { flex-direction: column; gap: 8px; }
   .hv-link { width: 1px; height: 14px; align-self: center; }
 }
+
+/* Review player + multi-item awaiting card */
+.review-player {
+  width: 100%; max-width: 640px; border-radius: 10px; margin: 10px 0;
+  border: 1px solid var(--border); background: #000; display: block;
+}
+.hv-await + .hv-await { margin-top: 14px; }
+.hv-await-sep { padding-top: 14px; border-top: 1px solid var(--border); }

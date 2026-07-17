@@ -741,6 +741,14 @@ def autopilot_new():
     if not cid or not ch.is_complete(cid):
         return jsonify(ok=False, error="Complete channel setup first",
                        redirect=url_for("onboarding"))
+    # Pre-flight: autopilot spends real money on generation before it ever
+    # reaches the upload step. Refuse to start if YouTube isn't connected.
+    import youtube_upload as yu
+    if not yu.is_connected(cid):
+        return jsonify(ok=False,
+                       error="Connect your YouTube channel before running Autopilot — "
+                             "otherwise it would spend AI credits and then fail at upload.",
+                       connect_url=url_for("oauth_start"))
     project = state.create_project()
     channel_name = (channel or {}).get("channel_name", "")
     state.update_project(
@@ -1158,6 +1166,32 @@ def step4_save_seo(pid):
             "generated":   True,
         },
     )
+    return jsonify(ok=True)
+
+
+@app.route("/project/<pid>/veto", methods=["POST"])
+@auth.login_required
+def project_veto(pid):
+    """
+    Veto a scheduled video: force it back to private on YouTube and clear the
+    scheduled publish time, so it will NOT go live. The video is kept (private),
+    not deleted. This is the real mechanism behind "nothing publishes without
+    your OK."
+    """
+    import youtube_upload as yu
+    project = state.get_project(pid)
+    if project is None:
+        return jsonify(ok=False, error="Project not found"), 404
+    yt = project.get("youtube", {})
+    video_id = yt.get("video_id")
+    if not video_id:
+        return jsonify(ok=False, error="This video hasn't been uploaded yet — "
+                       "nothing to veto.")
+    cid = project.get("channel_id", "") or ""
+    result = yu.cancel_scheduled_publish(video_id, cid)
+    if not result.get("ok"):
+        return jsonify(ok=False, error=result.get("error") or "Could not cancel on YouTube.")
+    state.update_project(pid, youtube={"scheduled_publish_at": None, "vetoed": True})
     return jsonify(ok=True)
 
 
