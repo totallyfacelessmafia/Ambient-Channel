@@ -1,0 +1,281 @@
+<title>AmbiHub Dashboard Concept</title>
+<style>
+  /* AmbiHub dashboard shell: moody dark-mode glassmorphism.
+     Spec: ink void #0B1221 to #162033, glass rgba(22,32,51,.4) blur 14,
+     light-catch border rgba(226,232,240,.08), Luminous Cyan #4AD1E3 (glows),
+     Clarity White #E2E8F0. Single theme by design: AmbiHub is nocturnal. */
+  :root {
+    color-scheme: dark;
+    --void1: #0B1221; --void2: #162033;
+    --glass: rgba(22, 32, 51, 0.40);
+    --glass-hi: rgba(22, 32, 51, 0.60);
+    --edge: rgba(226, 232, 240, 0.08);
+    --cyan: #4AD1E3; --cyan-glow: rgba(74, 209, 227, 0.55);
+    --amber: #E8A85C;
+    --text: #E2E8F0; --muted: #8FA3C0;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    color: var(--text);
+    font: 400 14px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background:
+      radial-gradient(ellipse 70% 45% at 50% 115%, rgba(74,209,227,.10), transparent 60%),
+      radial-gradient(ellipse 35% 22% at 88% 100%, rgba(232,168,92,.07), transparent 70%),
+      linear-gradient(180deg, var(--void1) 0%, #0E1729 45%, var(--void2) 100%);
+    background-attachment: fixed;
+    overflow: hidden;
+  }
+  .glass {
+    background: var(--glass);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border: 1px solid var(--edge); border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.2);
+    transition: border-color .2s ease, background-color .2s ease;
+  }
+  .glass:hover { border-color: rgba(226,232,240,.15); }
+
+  /* App frame */
+  .app { display: grid; grid-template-rows: 60px 1fr; height: 100vh; padding: 14px; gap: 14px; }
+  .frame { display: grid; grid-template-columns: 210px 1fr 320px; gap: 14px; min-height: 0; }
+
+  /* Header */
+  .header { display: flex; align-items: center; gap: 18px; padding: 0 20px; }
+  .logo { font-size: 17px; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+  .logo .hub { color: var(--cyan); }
+  .logo .bolt { color: var(--amber); }
+  .search { flex: 1; max-width: 420px; margin: 0 auto; }
+  .search input {
+    width: 100%; padding: 8px 14px; border-radius: 8px; color: var(--text);
+    background: rgba(51, 65, 85, 0.5); border: 1px solid var(--edge);
+    font: inherit; outline: none; transition: border-color .2s ease;
+  }
+  .search input:focus { border-color: rgba(74,209,227,.5); }
+  .search input::placeholder { color: var(--muted); }
+  .htools { display: flex; align-items: center; gap: 14px; margin-left: auto; }
+  .htools .dot { position: relative; color: var(--muted); font-size: 16px; }
+  .htools .dot::after { content: ""; position: absolute; top: -1px; right: -3px; width: 6px; height: 6px;
+    border-radius: 50%; background: var(--cyan); }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; overflow: hidden;
+    background: linear-gradient(135deg, #1C3550, #0E1729); border: 1px solid var(--edge);
+    display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--cyan); }
+
+  /* Sidebar: more grounded (higher opacity) */
+  .side { background: var(--glass-hi); padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px;
+    color: var(--muted); font-weight: 500; cursor: default; transition: all .2s ease; }
+  .nav-item:hover { color: var(--text); background: rgba(226,232,240,.04); }
+  .nav-item.active { color: #06232A; background: var(--cyan); font-weight: 600;
+    box-shadow: 0 0 14px rgba(74,209,227,.35); }
+  .nav-item .ico { width: 16px; text-align: center; opacity: .9; }
+  .side .spacer { flex: 1; }
+  .side .foot { color: var(--muted); font-size: 11px; padding: 10px 12px; }
+  .side .foot b { color: var(--text); }
+
+  /* Workspace */
+  .work { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .designer { flex: 1; padding: 26px 28px; display: flex; flex-direction: column; min-height: 0; }
+  .designer h1 { font-size: 21px; font-weight: 700; letter-spacing: -.02em; }
+  .designer .sub { color: var(--muted); margin-top: 4px; }
+
+  /* Autopilot flow */
+  .flow { display: flex; align-items: stretch; gap: 0; margin: 30px 0 8px; }
+  .node { flex: 1; background: rgba(14, 22, 38, 0.55); border: 1px solid var(--edge);
+    border-radius: 10px; padding: 14px 14px 12px; position: relative; transition: border-color .2s ease; }
+  .node:hover { border-color: rgba(74,209,227,.4); }
+  .node .k { font: 600 10px var(--mono); letter-spacing: .14em; text-transform: uppercase;
+    color: var(--cyan); }
+  .node .t { font-weight: 600; margin-top: 6px; font-size: 14px; }
+  .node .d { color: var(--muted); font-size: 12px; margin-top: 3px; line-height: 1.4; }
+  .link { width: 26px; align-self: center; height: 1px; background: var(--cyan); opacity: .55; flex: none; }
+  .flow-note { color: var(--muted); font-size: 12px; margin-top: 14px; }
+  .flow-note b { color: var(--amber); font-weight: 600; }
+
+  .cta-row { margin-top: auto; padding-top: 22px; display: flex; align-items: center; gap: 16px; }
+  .cta {
+    background: var(--cyan); color: #06232A; border: 0; border-radius: 10px;
+    padding: 13px 26px; font: 600 15px/1 inherit; font-family: inherit; cursor: pointer;
+    box-shadow: 0 0 16px var(--cyan-glow); transition: box-shadow .2s ease, transform .1s ease;
+  }
+  .cta:hover { box-shadow: 0 0 26px var(--cyan-glow); transform: translateY(-1px); }
+  .cta-row .cost { color: var(--muted); font-size: 13px; }
+  .cta-row .cost b { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  /* Project strip */
+  .strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  .proj { padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+  .thumb { width: 64px; height: 36px; border-radius: 6px; flex: none;
+    background: linear-gradient(160deg, #1B3A55 0%, #0F2238 55%, #2C4A66 100%); border: 1px solid var(--edge); }
+  .proj .pt { font-weight: 600; font-size: 13px; line-height: 1.3; }
+  .proj .ps { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+
+  /* Right stack */
+  .stack { display: flex; flex-direction: column; gap: 14px; min-height: 0; overflow: auto; }
+  .card { padding: 18px 20px; }
+  .card h2 { font-size: 12px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--muted); font-family: var(--mono); margin-bottom: 14px; }
+  .rows { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row .day { font: 600 12px var(--mono); color: var(--muted); width: 58px;
+    font-variant-numeric: tabular-nums; }
+  .row .what { font-size: 13px; font-weight: 500; flex: 1; }
+  .pill { font: 600 10px/1 var(--mono); letter-spacing: .1em; padding: 5px 9px;
+    border-radius: 999px; text-transform: uppercase; white-space: nowrap; }
+  .pill.on   { color: var(--cyan);  border: 1px solid rgba(74,209,227,.45); }
+  .pill.wait { color: var(--amber); border: 1px solid rgba(232,168,92,.45); }
+  .pill.done { color: #34d399; border: 1px solid rgba(52,211,153,.4); }
+
+  .veto { border-color: rgba(232,168,92,.35); }
+  .veto .vt { font-weight: 600; font-size: 13.5px; line-height: 1.4; }
+  .veto .vd { color: var(--muted); font-size: 12px; margin: 6px 0 12px; }
+  .veto .actions { display: flex; gap: 10px; }
+  .sm { border-radius: 8px; padding: 8px 14px; font: 600 12.5px/1 inherit; font-family: inherit;
+    cursor: pointer; transition: all .2s ease; }
+  .sm.ok { background: var(--cyan); color: #06232A; border: 0; box-shadow: 0 0 10px rgba(74,209,227,.35); }
+  .sm.no { background: transparent; color: var(--text); border: 1px solid var(--edge); }
+  .sm.no:hover { border-color: rgba(226,232,240,.2); }
+
+  .meter { margin-top: 4px; }
+  .meter .m-top { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 7px; }
+  .meter .m-top b { font-variant-numeric: tabular-nums; }
+  .bar { height: 6px; border-radius: 999px; background: rgba(226,232,240,.08); overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 66%; border-radius: 999px;
+    background: linear-gradient(90deg, #2FA8BC, var(--cyan)); box-shadow: 0 0 8px rgba(74,209,227,.5); }
+  .ledger { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .lrow { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .lrow b { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; font-family: var(--mono); }
+
+  @media (max-width: 1100px) {
+    body { overflow: auto; }
+    .app { height: auto; }
+    .frame { grid-template-columns: 1fr; }
+    .side { flex-direction: row; overflow-x: auto; }
+    .side .spacer, .side .foot { display: none; }
+    .strip { grid-template-columns: 1fr; }
+  }
+</style>
+
+<div class="app">
+  <header class="header glass">
+    <div class="logo"><span class="bolt">⚡</span> Ambi<span class="hub">Hub</span></div>
+    <div class="search"><input type="search" placeholder="Search projects, videos, tracks…" aria-label="Search"></div>
+    <div class="htools">
+      <span class="dot" title="1 video awaiting your OK">🔔</span>
+      <span class="avatar" title="Ultra Focus Zone">UF</span>
+    </div>
+  </header>
+
+  <div class="frame">
+    <nav class="side glass" aria-label="Main">
+      <div class="nav-item"><span class="ico">⌂</span> Home</div>
+      <div class="nav-item"><span class="ico">▸</span> My Channels</div>
+      <div class="nav-item active"><span class="ico">⚙</span> Pipeline</div>
+      <div class="nav-item"><span class="ico">♫</span> Music Library</div>
+      <div class="nav-item"><span class="ico">▦</span> Image Library</div>
+      <div class="nav-item"><span class="ico">◔</span> Schedule</div>
+      <div class="nav-item"><span class="ico">✦</span> Settings</div>
+      <div class="spacer"></div>
+      <div class="foot">Channel<br><b>Ultra Focus Zone</b></div>
+    </nav>
+
+    <main class="work">
+      <section class="designer glass">
+        <h1>Autopilot</h1>
+        <p class="sub">Every step below runs itself. You only see the finished video, waiting for your OK.</p>
+
+        <div class="flow">
+          <div class="node">
+            <div class="k">01 · Scene</div>
+            <div class="t">4K Master</div>
+            <div class="d">FLUX Ultra image, Clarity upscale, thumbnail</div>
+          </div>
+          <div class="link"></div>
+          <div class="node">
+            <div class="k">02 · Loop</div>
+            <div class="t">Cinematic Dusk</div>
+            <div class="d">Locked camera, barely-there motion</div>
+          </div>
+          <div class="link"></div>
+          <div class="node">
+            <div class="k">03 · Music</div>
+            <div class="t">5 Fresh Tracks</div>
+            <div class="d">Stable Audio + your library pool</div>
+          </div>
+          <div class="link"></div>
+          <div class="node">
+            <div class="k">04 · Build</div>
+            <div class="t">1-Hour Render</div>
+            <div class="d">Now Playing overlay, chapters, SEO</div>
+          </div>
+          <div class="link"></div>
+          <div class="node">
+            <div class="k">05 · Publish</div>
+            <div class="t">Private First</div>
+            <div class="d">Goes live at your slot unless you veto</div>
+          </div>
+        </div>
+        <p class="flow-note">Loop checkpoint is on: autopilot pauses at step 02 and sends you the
+        preview. <b>Nothing publishes without your OK.</b></p>
+
+        <div class="cta-row">
+          <button class="cta">Run Autopilot</button>
+          <span class="cost">est. <b>$1.54</b> per video · ~40 min hands-free</span>
+        </div>
+      </section>
+
+      <div class="strip">
+        <div class="proj glass">
+          <div class="thumb"></div>
+          <div><div class="pt">Deep Work Music, Unrivaled Depth</div>
+          <div class="ps">Scheduled · Fri Jul 24, 9:00 AM</div></div>
+        </div>
+        <div class="proj glass">
+          <div class="thumb"></div>
+          <div><div class="pt">Flow State, Ocean Glass Office</div>
+          <div class="ps">Rendering · 12 min remaining</div></div>
+        </div>
+        <div class="proj glass">
+          <div class="thumb"></div>
+          <div><div class="pt">Zero Distractions, Rain at Dusk</div>
+          <div class="ps">Queued · Mon Jul 27</div></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="stack">
+      <div class="card glass veto">
+        <h2>Awaiting Your OK</h2>
+        <div class="vt">Deep Work Music, Unrivaled Depth 2026 (1 Hour)</div>
+        <div class="vd">Uploaded private · goes live Fri Jul 24, 9:00 AM unless vetoed</div>
+        <div class="actions">
+          <button class="sm ok">Approve</button>
+          <button class="sm no">Watch First</button>
+        </div>
+      </div>
+
+      <div class="card glass">
+        <h2>This Week</h2>
+        <div class="rows">
+          <div class="row"><span class="day">Mon 20</span><span class="what">Focus Zone</span><span class="pill done">Live</span></div>
+          <div class="row"><span class="day">Wed 22</span><span class="what">Flow State</span><span class="pill on">Rendering</span></div>
+          <div class="row"><span class="day">Fri 24</span><span class="what">Deep Work</span><span class="pill wait">Your OK</span></div>
+        </div>
+      </div>
+
+      <div class="card glass">
+        <h2>Usage · July</h2>
+        <div class="meter">
+          <div class="m-top"><span>Videos this month</span><b>4 of 6</b></div>
+          <div class="bar"><i></i></div>
+        </div>
+        <div class="ledger">
+          <div class="lrow"><span>Avg cost per video</span><b>$1.54</b></div>
+          <div class="lrow"><span>Fresh tracks added</span><b>20</b></div>
+          <div class="lrow"><span>Watch time this week</span><b>+18%</b></div>
+        </div>
+      </div>
+    </aside>
+  </div>
+</div>
