@@ -22,28 +22,45 @@
     color: var(--text);
     font: 400 14px/1.55 -apple-system, "Segoe UI", system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
-    background:
-      radial-gradient(ellipse 75% 50% at 50% 118%, rgba(77,130,255,.16), transparent 62%),
-      radial-gradient(ellipse 40% 24% at 12% -4%, rgba(77,130,255,.10), transparent 70%),
-      radial-gradient(ellipse 30% 20% at 88% 102%, rgba(232,168,92,.06), transparent 70%),
-      linear-gradient(180deg, #070D1E 0%, #0B1735 48%, #143060 100%);
+    background: linear-gradient(180deg, #060B18 0%, #0A1530 55%, #102448 100%);
     background-attachment: fixed;
     overflow: hidden;
   }
+  /* The ambient light field BEHIND the glass. This is what the blur frosts:
+     without visible light back here, translucent panels read as solid walls. */
+  .orbs { position: fixed; inset: -20%; z-index: 0; pointer-events: none; filter: blur(70px); }
+  .orbs i { position: absolute; border-radius: 50%; display: block; }
+  .orbs .o1 { width: 46vw; height: 46vw; left: -10vw; top: -12vh;
+    background: radial-gradient(circle, rgba(61,107,255,.55), transparent 65%); }
+  .orbs .o2 { width: 38vw; height: 38vw; right: -8vw; top: 16vh;
+    background: radial-gradient(circle, rgba(124,92,255,.45), transparent 65%); }
+  .orbs .o3 { width: 42vw; height: 42vw; left: 26vw; bottom: -20vh;
+    background: radial-gradient(circle, rgba(42,120,255,.50), transparent 65%); }
+  .orbs .o4 { width: 24vw; height: 24vw; right: 6vw; bottom: -8vh;
+    background: radial-gradient(circle, rgba(232,168,92,.32), transparent 65%); }
+  @media (prefers-reduced-motion: no-preference) {
+    .orbs .o1 { animation: drift1 26s ease-in-out infinite alternate; }
+    .orbs .o2 { animation: drift2 34s ease-in-out infinite alternate; }
+    .orbs .o3 { animation: drift1 40s ease-in-out infinite alternate-reverse; }
+    @keyframes drift1 { to { transform: translate(6vw, 4vh) scale(1.12); } }
+    @keyframes drift2 { to { transform: translate(-5vw, 6vh) scale(0.92); } }
+  }
   .glass {
-    background: var(--glass);
-    -webkit-backdrop-filter: blur(16px) saturate(150%);
-    backdrop-filter: blur(16px) saturate(150%);
-    border: 1px solid var(--edge); border-radius: 14px;
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,.14),
-      inset 1px 0 0 rgba(255,255,255,.05),
-      0 12px 36px rgba(3, 7, 22, 0.50);
+    background: rgba(10, 25, 50, 0.45);         /* semi-transparent: the orbs show through */
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);                 /* the actual frosted-glass mechanic */
+    border: 1px solid rgba(255, 255, 255, 0.08); /* light-catch edge */
+    border-top-color: rgba(255, 255, 255, 0.16); /* bevel: light from above-left */
+    border-left-color: rgba(255, 255, 255, 0.11);
+    border-bottom-color: rgba(4, 8, 20, 0.60);   /* bevel: shade below-right */
+    border-right-color: rgba(4, 8, 20, 0.45);
+    border-radius: 14px;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); /* deep floating depth */
     transition: border-color .2s ease, background-color .2s ease;
   }
-  .glass:hover { border-color: rgba(255,255,255,.16); background: rgba(148,175,255,.08); }
+  .glass:hover { background: rgba(10, 25, 50, 0.52); border-top-color: rgba(255,255,255,.22); }
 
-  .app { display: grid; grid-template-rows: 60px 1fr; height: 100vh; padding: 14px; gap: 14px; }
+  .app { position: relative; z-index: 1; display: grid; grid-template-rows: 60px 1fr; height: 100vh; padding: 14px; gap: 14px; }
   .frame { display: grid; grid-template-columns: 210px 1fr 320px; gap: 14px; min-height: 0; }
 
   .header { display: flex; align-items: center; gap: 18px; padding: 0 20px; }
@@ -66,7 +83,7 @@
     background: linear-gradient(135deg, #1D3466, #0C1730); border: 1px solid var(--edge);
     display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--blue-soft); }
 
-  .side { background: var(--glass-hi); padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; }
+  .side { background: rgba(10, 25, 50, 0.62); padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; }
   .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 9px;
     color: var(--muted); font-weight: 500; cursor: default; transition: all .2s ease; }
   .nav-item:hover { color: var(--text); background: rgba(255,255,255,.05); }
@@ -85,10 +102,12 @@
 
   .flow { display: flex; align-items: stretch; gap: 0; margin: 30px 0 8px; }
   .node { flex: 1; border-radius: 12px; padding: 14px 14px 12px; position: relative;
-    background: rgba(7, 13, 30, 0.38);
-    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-    border: 1px solid rgba(148, 175, 255, 0.14);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,.07);
+    background: rgba(6, 14, 32, 0.35);
+    -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.07);
+    border-top-color: rgba(255,255,255,.13);
+    border-bottom-color: rgba(4,8,20,.5);
+    box-shadow: 0 4px 16px rgba(0,0,0,.25);
     transition: border-color .2s ease, box-shadow .2s ease; }
   .node:hover { border-color: rgba(77,130,255,.55); box-shadow:
     inset 0 1px 0 rgba(255,255,255,.07), 0 0 14px rgba(77,130,255,.25); }
@@ -167,6 +186,7 @@
   }
 </style>
 
+<div class="orbs" aria-hidden="true"><i class="o1"></i><i class="o2"></i><i class="o3"></i><i class="o4"></i></div>
 <div class="app">
   <header class="header glass">
     <div class="logo"><span class="bolt">⚡</span> Ambi<span class="hub">Hub</span></div>

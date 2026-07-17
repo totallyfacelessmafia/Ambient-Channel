@@ -4,9 +4,9 @@
 :root {
   /* AmbiHub Blue Hour theme (brand board v3): twilight blues, glass panels,
      Signal Teal as the single accent, Lamp Amber for warmth. */
-  --bg:        #070D1E;                    /* rich navy void          */
-  --surface:   rgba(148, 175, 255, 0.07);  /* frosted blue-tint glass */
-  --border:    rgba(255, 255, 255, 0.10);  /* reflective 1px edge     */
+  --bg:        #060B18;                    /* rich navy void          */
+  --surface:   rgba(10, 25, 50, 0.45);     /* semi-transparent glass  */
+  --border:    rgba(255, 255, 255, 0.08);  /* reflective 1px edge     */
   --text:      #E6ECFA;                    /* Clarity White           */
   --muted:     #93A5CE;                    /* blue-biased muted       */
   --accent:    #4D82FF;                    /* Electric Sapphire       */
@@ -2680,29 +2680,38 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover { opacity:
    Glass (translucent, blurred, hairline light edge), the material the
    product's own Now Playing overlay already uses. */
 body {
-  background:
-    radial-gradient(ellipse 75% 50% at 50% 118%, rgba(77,130,255,.14), transparent 62%),
-    radial-gradient(ellipse 40% 24% at 12% -4%, rgba(77,130,255,.08), transparent 70%),
-    radial-gradient(ellipse 30% 20% at 88% 102%, rgba(232,168,92,.05), transparent 70%),
-    linear-gradient(180deg, #070D1E 0%, #0B1735 48%, #143060 100%);
+  background: linear-gradient(180deg, #060B18 0%, #0A1530 55%, #102448 100%);
   background-attachment: fixed;
+}
+
+/* Ambient light field BEHIND the glass. This is what the blur frosts:
+   without visible light back here, translucent panels read as solid walls. */
+body::before {
+  content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
+  filter: blur(70px);
+  background:
+    radial-gradient(circle at 14% 10%, rgba(61,107,255,.50), transparent 26%),
+    radial-gradient(circle at 86% 26%, rgba(124,92,255,.40), transparent 24%),
+    radial-gradient(circle at 45% 96%, rgba(42,120,255,.45), transparent 26%),
+    radial-gradient(circle at 90% 88%, rgba(232,168,92,.28), transparent 18%);
 }
 
 .step-panel, .login-card, .project-card, .pipeline-card, .stat-card,
 .ob-section, .research-section, .list-view, .suno-panel, .navbar {
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  backdrop-filter: blur(16px) saturate(150%);
-  box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.14),
-    inset 1px 0 0 rgba(255,255,255,.05),
-    0 12px 36px rgba(3,7,22,.50);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-top-color: rgba(255,255,255,.16);    /* bevel: light from above-left */
+  border-left-color: rgba(255,255,255,.11);
+  border-bottom-color: rgba(4,8,20,.60);      /* bevel: shade below-right */
+  border-right-color: rgba(4,8,20,.45);
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,.37);   /* deep floating depth */
   transition: border-color .2s ease, background-color .2s ease;
 }
 .step-panel:hover, .project-card:hover, .pipeline-card:hover, .stat-card:hover {
-  border-color: rgba(255,255,255,.16);
-  background: rgba(148,175,255,.09);
+  background: rgba(10,25,50,.52);
+  border-top-color: rgba(255,255,255,.22);
 }
-.navbar { background: rgba(148, 175, 255, 0.10); }
+.navbar { background: rgba(10, 25, 50, 0.62); }
 
 /* Luminous primaries: the one glowing light source per view */
 .btn-primary {
