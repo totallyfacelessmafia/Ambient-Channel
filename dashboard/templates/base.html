@@ -12,6 +12,24 @@
     <header class="app-header">
       <a class="logo" href="{{ url_for('index') }}">
         <span class="logo-bolt">⚡</span> Ambi<span class="logo-hub">Hub</span></a>
+      {% if g.all_channels %}
+      <div class="channel-switcher" id="channel-switcher">
+        <button class="channel-switcher-btn" onclick="toggleChannelMenu(event)" type="button">
+          <span class="channel-switcher-name">{{ (g.active_channel.channel_name if g.active_channel else '') or 'Channel' }}</span>
+          <span class="channel-switcher-caret">&#9660;</span>
+        </button>
+        <div class="channel-switcher-menu hidden" id="channel-switcher-menu">
+          {% for c in g.all_channels %}
+          <button type="button" class="channel-menu-item{% if c.id == g.active_cid %} channel-menu-item-active{% endif %}"
+                  onclick="switchChannel('{{ c.id }}')">{{ c.channel_name or '(unnamed)' }}</button>
+          {% endfor %}
+          <div class="channel-menu-divider"></div>
+          <form method="POST" action="{{ url_for('channel_new') }}" style="margin:0">
+            <button type="submit" class="channel-menu-item channel-menu-new">+ New Channel</button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
       <div class="htools">
         <a class="btn btn-primary btn-sm" href="{{ url_for('new_project_form') }}">+ New Project</a>
         <span class="nav-user">{{ session.user }}</span>
@@ -42,7 +60,29 @@
         </div>
       </main>
     </div>
+
+    <!-- Shared project detail panel (opened by openPanel) -->
+    <aside class="detail-panel" id="detail-panel"><div class="panel-body" id="panel-body"></div></aside>
+    <div class="panel-backdrop" id="panel-backdrop" onclick="closePanel()"></div>
   </div>
+
+  <script src="{{ url_for('static', filename='panel.js') }}"></script>
+  <script>
+    function toggleChannelMenu(e) {
+      e.stopPropagation();
+      var m = document.getElementById('channel-switcher-menu');
+      if (m) m.classList.toggle('hidden');
+    }
+    document.addEventListener('click', function() {
+      var m = document.getElementById('channel-switcher-menu');
+      if (m) m.classList.add('hidden');
+    });
+    function switchChannel(cid) {
+      fetch('/channels/switch/' + cid, { method: 'POST' })
+        .then(function(r){ return r.json(); })
+        .then(function(d){ if (d.ok) location.reload(); });
+    }
+  </script>
   {% else %}
   <main class="container">
     {{ self.content() }}

@@ -1,69 +1,100 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AmbiHub</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=6">
-</head>
-<body class="dashboard-body">
+{% extends "base.html" %}
+{% block title %}AmbiHub{% endblock %}
 
-<header class="dash-header">
-  <a class="dash-brand" href="/"><span class="logo-bolt">&#9889;</span> Ambi<span class="logo-hub">Hub</span></a>
-  <div class="dash-header-right">
-    <!-- Channel switcher -->
-    {% if g.all_channels %}
-    <div class="channel-switcher" id="channel-switcher">
-      <button class="channel-switcher-btn" onclick="toggleChannelMenu(event)" type="button">
-        <span class="channel-switcher-name">{{ (g.active_channel.channel_name if g.active_channel else '') or 'Channel' }}</span>
-        <span class="channel-switcher-caret">&#9660;</span>
-      </button>
-      <div class="channel-switcher-menu hidden" id="channel-switcher-menu">
-        {% for c in g.all_channels %}
-        <button type="button" class="channel-menu-item{% if c.id == g.active_cid %} channel-menu-item-active{% endif %}"
-                onclick="switchChannel('{{ c.id }}')">
-          {{ c.channel_name or '(unnamed)' }}
-        </button>
+{% block content %}
+<div class="home-view">
+
+  <!-- ── Concept overview: Autopilot hero + status stack ──────────────────── -->
+  <div class="home-grid">
+    <main class="home-main">
+      <section class="hv-designer glass">
+        <h1>Autopilot</h1>
+        <p class="hv-sub">Every step below runs itself. You only see the finished video, waiting for your OK.</p>
+
+        <div class="hv-flow">
+          <div class="hv-node"><div class="hv-k">01 · Scene</div><div class="hv-t">4K Master</div>
+            <div class="hv-d">FLUX Ultra image, Clarity upscale, thumbnail</div></div>
+          <div class="hv-link"></div>
+          <div class="hv-node"><div class="hv-k">02 · Loop</div><div class="hv-t">Cinematic Dusk</div>
+            <div class="hv-d">Locked camera, barely-there motion</div></div>
+          <div class="hv-link"></div>
+          <div class="hv-node"><div class="hv-k">03 · Music</div><div class="hv-t">5 Fresh Tracks</div>
+            <div class="hv-d">Stable Audio + your library pool</div></div>
+          <div class="hv-link"></div>
+          <div class="hv-node"><div class="hv-k">04 · Build</div><div class="hv-t">1-Hour Render</div>
+            <div class="hv-d">Now Playing overlay, chapters, SEO</div></div>
+          <div class="hv-link"></div>
+          <div class="hv-node"><div class="hv-k">05 · Publish</div><div class="hv-t">Private First</div>
+            <div class="hv-d">Goes live at your slot unless you veto</div></div>
+        </div>
+        <p class="hv-flow-note">Uploads go private with a scheduled time.
+          <b>Nothing publishes without your OK.</b></p>
+
+        <div class="hv-cta-row">
+          <button class="hv-cta" id="run-autopilot-btn" onclick="runNewAutopilot(this)">Run Autopilot</button>
+          <span class="hv-cost">est. <b>$1.54</b> per video · ~40 min hands-free · uses AI credits</span>
+        </div>
+      </section>
+
+      {% if recent_projects %}
+      <div class="hv-strip">
+        {% for p in recent_projects %}
+        <a class="hv-proj glass" href="/project/{{ p.id }}">
+          <div class="hv-thumb"{% if p.thumbnail %} style="background-image:url('/files/{{ p.thumbnail }}')"{% endif %}></div>
+          <div><div class="hv-pt">{{ p.title }}</div><div class="hv-ps">{{ p.status_label }}</div></div>
+        </a>
         {% endfor %}
-        <div class="channel-menu-divider"></div>
-        <form method="POST" action="{{ url_for('channel_new') }}" style="margin:0">
-          <button type="submit" class="channel-menu-item channel-menu-new">+ New Channel</button>
-        </form>
       </div>
-    </div>
-    {% endif %}
-    <span class="nav-user">{{ session.user }}</span>
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('onboarding') }}">Channel Setup</a>
-    <form method="POST" action="{{ url_for('logout') }}" style="display:inline">
-      <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
-    </form>
-  </div>
-</header>
+      {% endif %}
+    </main>
 
-<div class="dash-layout" id="dash-layout">
+    <aside class="hv-stack">
+      {% for a in awaiting %}
+      <div class="hv-card glass hv-veto">
+        <h2>Awaiting Your OK</h2>
+        <div class="hv-vt">{{ a.title }}</div>
+        <div class="hv-vd">Uploaded private · goes live <span class="js-utc-local" data-utc="{{ a.publish_at }}">{{ a.publish_at[:10] }}</span> unless you veto</div>
+        <div class="hv-actions">
+          <a class="hv-sm ok" href="/project/{{ a.id }}">Review</a>
+          <a class="hv-sm no" href="https://youtube.com/watch?v={{ a.id }}" onclick="return false" title="Open the project to preview">Watch First</a>
+        </div>
+      </div>
+      {% endfor %}
 
-  <!-- ── Zone A: Left navigation ─────────────────────────────────────────── -->
-  <nav class="dash-nav">
-    <div class="dash-nav-links">
-      <a class="dash-nav-link active" href="/">&#8862; Dashboard</a>
-      <a class="dash-nav-link" href="{{ url_for('image_library_page') }}">&#128444; Image Library</a>
-      <a class="dash-nav-link" href="{{ url_for('research_page') }}" style="justify-content:space-between">
-        <span>&#128202; Research</span>
-        {% if g.research_unseen > 0 %}
-        <span class="nav-badge">{{ g.research_unseen }}</span>
+      <div class="hv-card glass">
+        <h2>This Week</h2>
+        {% if this_week %}
+        <div class="hv-rows">
+          {% for w in this_week %}
+          <div class="hv-row" onclick="openPanel('{{ w.id }}')">
+            <span class="hv-day">{{ w.date[5:] }}</span>
+            <span class="hv-what">{{ w.title }}</span>
+            <span class="hv-pill {{ w.state }}">{{ {'live':'Live','scheduled':'Scheduled','rendering':'Rendering','queued':'Queued','error':'Error'}[w.state] }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="hv-empty">Nothing scheduled this week. Use the scheduler below to plan a cadence.</p>
         {% endif %}
-      </a>
-      <a class="dash-nav-link" href="{{ url_for('onboarding') }}">&#9881; Channel Setup</a>
-    </div>
-  </nav>
+      </div>
 
-  <!-- ── Zone B: Main workspace ──────────────────────────────────────────── -->
-  <div class="dash-main" id="dash-main">
+      <div class="hv-card glass">
+        <h2>Usage · {{ month_name }}</h2>
+        <div class="hv-meter">
+          <div class="hv-m-top"><span>Videos this month</span><b>{{ usage.count }} of {{ usage.target }}</b></div>
+          <div class="hv-bar"><i style="width:{{ (100 * usage.count / usage.target)|round(0, 'floor') if usage.target else 0 }}%"></i></div>
+        </div>
+        <div class="hv-ledger">
+          {% if usage.avg_cost %}<div class="hv-lrow"><span>Avg cost per video</span><b>${{ usage.avg_cost }}</b></div>{% endif %}
+          <div class="hv-lrow"><span>Published all-time</span><b>{{ usage.published }}</b></div>
+          <div class="hv-lrow"><span>Total projects</span><b>{{ stats.total }}</b></div>
+        </div>
+      </div>
+    </aside>
+  </div>
 
-    <!-- Tools row: Scheduler + Generator side by side -->
-    <div class="tools-row">
-
-    <!-- Content Scheduler -->
+  <!-- ── Working tools (manual flow) ──────────────────────────────────────── -->
+  <div class="tools-row">
     <section class="control-center">
       <div class="cc-title">Content Scheduler</div>
       <div class="cc-controls">
@@ -97,236 +128,152 @@
       </div>
     </section>
 
-    <!-- Generator -->
     <section class="generator-shell">
-      <div class="sidebar-section-header">
-        <h3>The Generator</h3>
-      </div>
+      <div class="sidebar-section-header"><h3>The Generator</h3></div>
       <div class="generator-grid">
         <label class="generator-field generator-field-wide">
           <span>Prompt</span>
           <input id="generator-prompt" type="text" list="prompt-suggestions" placeholder="Ambient scene, mood, environment&hellip;" value="Ultra Focus Zone ambient scene">
         </label>
         <datalist id="prompt-suggestions">
-          {% for suggestion in prompt_suggestions %}
-          <option value="{{ suggestion }}"></option>
-          {% endfor %}
+          {% for suggestion in prompt_suggestions %}<option value="{{ suggestion }}"></option>{% endfor %}
         </datalist>
-        <label class="generator-field">
-          <span>Qty</span>
-          <input id="generator-qty" type="number" min="1" max="20" value="5" style="width:56px">
-        </label>
-        <label class="generator-toggle">
-          <input id="generator-style" type="checkbox" checked>
-          <span>Channel Style</span>
-        </label>
+        <label class="generator-field"><span>Qty</span>
+          <input id="generator-qty" type="number" min="1" max="20" value="5" style="width:56px"></label>
+        <label class="generator-toggle"><input id="generator-style" type="checkbox" checked><span>Channel Style</span></label>
         <button class="btn btn-primary btn-sm generator-cta" onclick="createBatchFromGenerator()">Generate</button>
       </div>
     </section>
+  </div>
 
-    </div><!-- /tools-row -->
+  <!-- Pipeline cards -->
+  <section class="pipeline-cards-section">
+    <div class="pipeline-section-header">
+      <h3>Content Pipeline</h3>
+      <span class="pipeline-section-count">{{ unscheduled|length }}</span>
+    </div>
+    {% if unscheduled %}
+    <div class="pipeline-cards-grid">
+      {% for p in unscheduled %}
+        {% set badge = 'Needs Selection' %}
+        {% if p.step == 2 and p.status == 'running' %}{% set badge = 'Looping' %}
+        {% elif p.step == 3 and p.status == 'running' %}{% set badge = 'Rendering' %}
+        {% elif p.step == 3 and p.status == 'done' %}{% set badge = 'Ready to Publish' %}
+        {% elif p.step == 4 and p.youtube and p.youtube.upload_status == 'done' %}{% set badge = 'Published' %}
+        {% elif p.step == 4 %}{% set badge = 'Ready to Schedule' %}{% endif %}
+        <button class="pipeline-card{% if p.status == 'running' %} pipeline-card-running{% elif p.status == 'error' %} pipeline-card-error{% endif %}" onclick="openPanel('{{ p.id }}')">
+          <div class="pipeline-card-thumb">
+            {% if p.files.thumbnail %}<img src="{{ url_for('serve_file', fp=p.files.thumbnail|basename) }}" alt="">
+            {% elif p.files.raw_image %}<img src="{{ url_for('serve_file', fp=p.files.raw_image|basename) }}" alt="">
+            {% else %}<div class="pipeline-card-no-thumb"></div>{% endif %}
+            <span class="pipeline-card-step">Step {{ p.step }}/4</span>
+            {% if p.status == 'running' %}<span class="pipeline-card-running-dot"></span>{% endif %}
+          </div>
+          <div class="pipeline-card-body">
+            <div class="pipeline-card-title">{{ p.title or 'Untitled Project' }}</div>
+            <span class="pipeline-badge pipeline-badge-{{ badge|lower|replace(' ', '-') }}">{{ badge }}</span>
+          </div>
+        </button>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="backlog-empty-msg">No active projects. Run Autopilot above, or use the Generator to start a batch.</p>
+    {% endif %}
+  </section>
 
-    <!-- Pipeline cards grid -->
-    <section class="pipeline-cards-section">
-      <div class="pipeline-section-header">
-        <h3>Content Pipeline</h3>
-        <span class="pipeline-section-count">{{ unscheduled|length }}</span>
+  <!-- Calendar accordion -->
+  <section class="cal-accordion">
+    <button class="cal-accordion-toggle" onclick="toggleCalendar()">
+      <span>&#128197; Content Calendar &mdash; {{ month_name }} {{ year }}</span>
+      <span class="cal-accordion-arrow" id="cal-arrow">&#9660;</span>
+    </button>
+    <div class="cal-accordion-body hidden" id="cal-accordion-body">
+      <div class="cal-accordion-nav">
+        <a class="cal-nav-btn" href="/?y={{ prev_y }}&m={{ prev_m }}">&#8249;</a>
+        <span class="cal-month-title">{{ month_name }} {{ year }}</span>
+        <a class="cal-nav-btn" href="/?y={{ next_y }}&m={{ next_m }}">&#8250;</a>
+        <a class="cal-today-btn" href="/">Today</a>
       </div>
-      {% if unscheduled %}
-      <div class="pipeline-cards-grid">
-        {% for p in unscheduled %}
-          {% set badge = 'Needs Selection' %}
-          {% if p.step == 2 and p.status == 'running' %}
-            {% set badge = 'Looping' %}
-          {% elif p.step == 3 and p.status == 'running' %}
-            {% set badge = 'Rendering' %}
-          {% elif p.step == 3 and p.status == 'done' %}
-            {% set badge = 'Ready to Publish' %}
-          {% elif p.step == 4 and p.youtube and p.youtube.upload_status == 'done' %}
-            {% set badge = 'Published' %}
-          {% elif p.step == 4 %}
-            {% set badge = 'Ready to Schedule' %}
-          {% endif %}
-          <button class="pipeline-card{% if p.status == 'running' %} pipeline-card-running{% elif p.status == 'error' %} pipeline-card-error{% endif %}" onclick="openPanel('{{ p.id }}')">
-            <div class="pipeline-card-thumb">
-              {% if p.files.thumbnail %}
-              <img src="{{ url_for('serve_file', fp=p.files.thumbnail|basename) }}" alt="">
-              {% elif p.files.raw_image %}
-              <img src="{{ url_for('serve_file', fp=p.files.raw_image|basename) }}" alt="">
-              {% else %}
-              <div class="pipeline-card-no-thumb"></div>
-              {% endif %}
-              <span class="pipeline-card-step">Step {{ p.step }}/4</span>
-              {% if p.status == 'running' %}<span class="pipeline-card-running-dot"></span>{% endif %}
-            </div>
-            <div class="pipeline-card-body">
-              <div class="pipeline-card-title">{{ p.title or 'Untitled Project' }}</div>
-              <span class="pipeline-badge pipeline-badge-{{ badge|lower|replace(' ', '-') }}">{{ badge }}</span>
-            </div>
-          </button>
+      <div class="cal-grid">
+        {% for day_label in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+        <div class="cal-col-header">{{ day_label }}</div>
+        {% endfor %}
+        {% for week in cal_weeks %}
+          {% for day in week %}
+            {% if day == 0 %}
+            <div class="cal-cell cal-cell-pad"></div>
+            {% else %}
+              {% set ds = '%04d-%02d-%02d' | format(year, month, day) %}
+              <div class="cal-cell {% if ds == today %}cal-cell-today{% endif %}" data-date="{{ ds }}">
+                <div class="cal-date-num {% if ds == today %}cal-date-today{% endif %}">{{ day }}</div>
+                {% for p in scheduled.get(ds, []) %}
+                <div class="cal-chip status-chip-{{ p.status }}" data-pid="{{ p.id }}" onclick="openPanel('{{ p.id }}')">
+                  {% if p.files.thumbnail %}<img class="cal-chip-thumb" src="{{ url_for('serve_file', fp=p.files.thumbnail|basename) }}" alt="">
+                  {% else %}<div class="cal-chip-icon status-dot-{{ p.status }}"></div>{% endif %}
+                  <span class="cal-chip-title">{{ p.title or 'Generating...' }}</span>
+                </div>
+                {% endfor %}
+                <button class="cal-add-btn" onclick="createProject('{{ ds }}')">+</button>
+              </div>
+            {% endif %}
+          {% endfor %}
         {% endfor %}
       </div>
-      {% else %}
-      <p class="backlog-empty-msg">No active projects. Use the Generator above to create a batch.</p>
-      {% endif %}
-    </section>
-
-    <!-- Calendar accordion (collapsed by default) -->
-    <section class="cal-accordion">
-      <button class="cal-accordion-toggle" onclick="toggleCalendar()">
-        <span>&#128197; Content Calendar &mdash; {{ month_name }} {{ year }}</span>
-        <span class="cal-accordion-arrow" id="cal-arrow">&#9660;</span>
-      </button>
-      <div class="cal-accordion-body hidden" id="cal-accordion-body">
-        <div class="cal-accordion-nav">
-          <a class="cal-nav-btn" href="/?y={{ prev_y }}&m={{ prev_m }}">&#8249;</a>
-          <span class="cal-month-title">{{ month_name }} {{ year }}</span>
-          <a class="cal-nav-btn" href="/?y={{ next_y }}&m={{ next_m }}">&#8250;</a>
-          <a class="cal-today-btn" href="/">Today</a>
-        </div>
-        <div class="cal-grid">
-          {% for day_label in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
-          <div class="cal-col-header">{{ day_label }}</div>
-          {% endfor %}
-
-          {% for week in cal_weeks %}
-            {% for day in week %}
-              {% if day == 0 %}
-              <div class="cal-cell cal-cell-pad"></div>
-              {% else %}
-                {% set ds = '%04d-%02d-%02d' | format(year, month, day) %}
-                <div class="cal-cell {% if ds == today %}cal-cell-today{% endif %}" data-date="{{ ds }}">
-                  <div class="cal-date-num {% if ds == today %}cal-date-today{% endif %}">{{ day }}</div>
-
-                  {% for p in scheduled.get(ds, []) %}
-                  <div class="cal-chip status-chip-{{ p.status }}" data-pid="{{ p.id }}" onclick="openPanel('{{ p.id }}')">
-                    {% if p.files.thumbnail %}
-                    <img class="cal-chip-thumb" src="{{ url_for('serve_file', fp=p.files.thumbnail|basename) }}" alt="">
-                    {% else %}
-                    <div class="cal-chip-icon status-dot-{{ p.status }}"></div>
-                    {% endif %}
-                    <span class="cal-chip-title">{{ p.title or 'Generating...' }}</span>
-                  </div>
-                  {% endfor %}
-
-                  <button class="cal-add-btn" onclick="createProject('{{ ds }}')">+</button>
-                </div>
-              {% endif %}
-            {% endfor %}
-          {% endfor %}
-        </div>
-      </div>
-    </section>
-
-    <!-- List view (kept for compat) -->
-    <div id="list-view" class="list-view hidden"></div>
-
-  </div><!-- /dash-main -->
-
-  <!-- ── Zone C: Stats sidebar ───────────────────────────────────────────── -->
-  <aside class="dash-stats">
-    <div class="stat-card">
-      <div class="stat-value">{{ stats.total }}</div>
-      <div class="stat-label">Total</div>
     </div>
-    <div class="stat-card">
-      <div class="stat-value stat-active">{{ stats.active }}</div>
-      <div class="stat-label">Active</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value stat-published">{{ stats.published }}</div>
-      <div class="stat-label">Published</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-value">{{ stats.scheduled }}</div>
-      <div class="stat-label">Scheduled</div>
-    </div>
-  </aside>
+  </section>
 
-  <!-- Detail panel (modal — unchanged) -->
-  <aside class="detail-panel" id="detail-panel">
-    <div class="panel-body" id="panel-body"></div>
-  </aside>
+  <div id="list-view" class="list-view hidden"></div>
+</div>
+{% endblock %}
 
-</div><!-- /dash-layout -->
-
-<div class="panel-backdrop" id="panel-backdrop" onclick="closePanel()"></div>
-
-<script src="{{ url_for('static', filename='app.js') }}"></script>
-<script src="{{ url_for('static', filename='panel.js') }}"></script>
+{% block scripts %}
 <script>
-var ALL_PROJECTS = {{ projects_data|tojson }};
+var ALL_PROJECTS          = {{ projects_data|tojson }};
 var IS_OPERATOR           = {{ g.is_operator | tojson }};
 var CHANNEL_OVERLAY_STYLE = {{ (g.active_channel.overlay_style if g.active_channel else 'default') | tojson }};
 (function() {
   const hash = location.hash.replace('#', '');
   if (hash && hash.length === 8) openPanel(hash);
+  document.querySelectorAll('.js-utc-local').forEach(function(s) {
+    if (s.dataset.utc) s.textContent = new Date(s.dataset.utc).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+  });
 })();
 
-// ── Calendar auto-refresh (every 60 seconds) ──────────────────────────────
-var _calYear  = {{ year }};
-var _calMonth = {{ month }};
+function runNewAutopilot(btn) {
+  if (!confirm('Run Autopilot?\n\nThis creates a new video and makes every decision automatically, then uploads it private with a scheduled publish time you can veto. It spends AI credits. Continue?')) return;
+  btn.disabled = true; btn.textContent = 'Starting…';
+  fetch('/autopilot/new', { method: 'POST' })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.ok) { location.href = '/project/' + j.pid; }
+      else { alert(j.error || 'Could not start autopilot.'); btn.disabled = false; btn.textContent = 'Run Autopilot'; }
+    });
+}
 
+var _calYear = {{ year }}, _calMonth = {{ month }};
 function _calRefresh() {
   fetch('/api/calendar?y=' + _calYear + '&m=' + _calMonth)
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
+    .then(function(r){ return r.json(); })
+    .then(function(d){
       if (!d.ok) return;
-
-      // Update each day cell's chips
-      var cells = document.querySelectorAll('.cal-cell[data-date]');
-      cells.forEach(function(cell) {
+      document.querySelectorAll('.cal-cell[data-date]').forEach(function(cell){
         var ds = cell.getAttribute('data-date');
-        // Remove old chips (keep the date number and the + button)
-        cell.querySelectorAll('.cal-chip').forEach(function(c) { c.remove(); });
-        // Insert refreshed chips before the + button
+        cell.querySelectorAll('.cal-chip').forEach(function(c){ c.remove(); });
         var addBtn = cell.querySelector('.cal-add-btn');
-        var projs  = d.chips[ds] || [];
-        projs.forEach(function(p) {
+        (d.chips[ds] || []).forEach(function(p){
           var chip = document.createElement('div');
           chip.className = 'cal-chip status-chip-' + p.status;
-          chip.setAttribute('data-pid', p.id);
-          chip.onclick = function() { openPanel(p.id); };
-          if (p.thumbnail) {
-            chip.innerHTML = '<img class="cal-chip-thumb" src="/files/' + p.thumbnail + '" alt="">'
-              + '<span class="cal-chip-title">' + (p.title || 'Generating...') + '</span>';
-          } else {
-            chip.innerHTML = '<div class="cal-chip-icon status-dot-' + p.status + '"></div>'
-              + '<span class="cal-chip-title">' + (p.title || 'Generating...') + '</span>';
-          }
+          chip.onclick = function(){ openPanel(p.id); };
+          chip.innerHTML = (p.thumbnail
+            ? '<img class="cal-chip-thumb" src="/files/' + p.thumbnail + '" alt="">'
+            : '<div class="cal-chip-icon status-dot-' + p.status + '"></div>')
+            + '<span class="cal-chip-title">' + (p.title || 'Generating...') + '</span>';
           cell.insertBefore(chip, addBtn);
         });
       });
-
-      // Update stats sidebar
-      var sv = document.querySelectorAll('.stat-value');
-      if (sv.length >= 4) {
-        sv[0].textContent = d.stats.total;
-        sv[1].textContent = d.stats.active;
-        sv[2].textContent = d.stats.published;
-        sv[3].textContent = d.stats.scheduled;
-      }
     })
-    .catch(function() {});
+    .catch(function(){});
 }
-
-setInterval(_calRefresh, 60000); // refresh every 60 seconds
-
-// ── Channel switcher ───────────────────────────────────────────────────────
-function toggleChannelMenu(e) {
-  e.stopPropagation();
-  var menu = document.getElementById('channel-switcher-menu');
-  if (menu) menu.classList.toggle('hidden');
-}
-document.addEventListener('click', function() {
-  var menu = document.getElementById('channel-switcher-menu');
-  if (menu) menu.classList.add('hidden');
-});
-function switchChannel(cid) {
-  fetch('/channels/switch/' + cid, { method: 'POST' })
-    .then(function(r) { return r.json(); })
-    .then(function(d) { if (d.ok) location.reload(); });
-}
+setInterval(_calRefresh, 60000);
 </script>
-</body>
-</html>
+{% endblock %}

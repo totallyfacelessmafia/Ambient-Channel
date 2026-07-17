@@ -630,6 +630,88 @@ def index():
         "scheduled": sum(1 for p in all_proj if p.get("scheduled_date")),
     }
 
+    # ── Concept-shell overview data ─────────────────────────────────────────
+    from datetime import datetime as _dt, timezone as _tz
+    now_utc = _dt.now(_tz.utc)
+    week_end = today + timedelta(days=7)
+
+    def _basename(v):
+        return Path(v).name if v else None
+
+    awaiting, this_week = [], []
+    for p in all_proj:
+        yt = p.get("youtube", {})
+        pub = yt.get("scheduled_publish_at")
+        # Awaiting your OK: uploaded private, publish time still in the future
+        if yt.get("upload_status") == "done" and pub:
+            try:
+                pub_dt = _dt.fromisoformat(pub.replace("Z", "+00:00"))
+                if pub_dt > now_utc:
+                    awaiting.append({
+                        "id": p["id"],
+                        "title": (p.get("seo", {}).get("title") or p.get("title") or "Untitled"),
+                        "publish_at": pub,
+                        "thumbnail": _basename(p["files"].get("thumbnail")),
+                    })
+            except ValueError:
+                pass
+        # This week: scheduled within the next 7 days
+        sd = p.get("scheduled_date")
+        if sd:
+            try:
+                d = date.fromisoformat(sd)
+                if today <= d <= week_end:
+                    if yt.get("upload_status") == "done":
+                        st = ("live" if not p.get("youtube", {}).get("scheduled_publish_at") else "scheduled")
+                    elif p.get("status") == "running":
+                        st = "rendering"
+                    elif p.get("status") == "error":
+                        st = "error"
+                    else:
+                        st = "queued"
+                    this_week.append({
+                        "id": p["id"], "date": sd,
+                        "title": p.get("title") or "Untitled", "state": st,
+                    })
+            except ValueError:
+                pass
+    awaiting.sort(key=lambda a: a["publish_at"])
+    this_week.sort(key=lambda w: w["date"])
+
+    # Recent / active projects strip (most recently touched, unfinished first)
+    def _proj_status_label(p):
+        yt = p.get("youtube", {})
+        if yt.get("upload_status") == "done":
+            pub = yt.get("scheduled_publish_at")
+            return f"Scheduled · {tasks.utc_to_local_date(pub)}" if pub else "Published"
+        if p.get("status") == "running":
+            step = p.get("task", {}).get("step_running")
+            return f"Running · step {step}" if step else "Running"
+        if p.get("status") == "error":
+            return "Needs attention"
+        return f"Draft · step {p.get('step', 1)} of 4"
+
+    recent = sorted(all_proj, key=lambda p: p.get("updated_at", ""), reverse=True)[:3]
+    recent_projects = [{
+        "id": p["id"],
+        "title": p.get("title") or "Untitled",
+        "status_label": _proj_status_label(p),
+        "thumbnail": _basename(p["files"].get("thumbnail") or p["files"].get("raw_image")),
+    } for p in recent]
+
+    # Usage this month (real ledger where present)
+    month_prefix = f"{year:04d}-{month:02d}"
+    month_projs = [p for p in all_proj if (p.get("scheduled_date") or "").startswith(month_prefix)]
+    costs = [p.get("ledger_total") for p in all_proj if p.get("ledger_total")]
+    ap_cfg = profile.get("autopilot", {}) if isinstance(profile, dict) else {}
+    per_week = int(ap_cfg.get("videos_per_week", 3) or 3)
+    usage = {
+        "count": len(month_projs),
+        "target": max(len(month_projs), per_week * 4),
+        "avg_cost": round(sum(costs) / len(costs), 2) if costs else None,
+        "published": stats["published"],
+    }
+
     return render_template(
         "index.html",
         year=year, month=month,
@@ -643,7 +725,33 @@ def index():
         prompt_suggestions=prompt_suggestions[:12],
         projects_data=projects_data,
         stats=stats,
+        channel_name=(profile.get("channel_name") or "Your Channel"),
+        awaiting=awaiting,
+        this_week=this_week,
+        recent_projects=recent_projects,
+        usage=usage,
     )
+
+
+@app.route("/autopilot/new", methods=["POST"])
+@auth.login_required
+def autopilot_new():
+    """Create a fresh project on the active channel and run autopilot on it."""
+    cid, channel = _require_channel()
+    if not cid or not ch.is_complete(cid):
+        return jsonify(ok=False, error="Complete channel setup first",
+                       redirect=url_for("onboarding"))
+    project = state.create_project()
+    channel_name = (channel or {}).get("channel_name", "")
+    state.update_project(
+        project["id"], channel_id=cid,
+        song_config={"channel_name": channel_name},
+        generation={"prompt": "", "use_channel_style": True, "quantity": 4},
+    )
+    if not autopilot.start_run_async(project["id"]):
+        return jsonify(ok=False, error="Autopilot is already running a video. "
+                       "Let it finish, then try again.")
+    return jsonify(ok=True, pid=project["id"])
 
 
 @app.route("/api/calendar")
