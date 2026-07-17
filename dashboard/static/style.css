@@ -5,7 +5,7 @@
   /* AmbiHub Blue Hour theme (brand board v3): twilight blues, glass panels,
      Signal Teal as the single accent, Lamp Amber for warmth. */
   --bg:        #060B18;                    /* rich navy void          */
-  --surface:   rgba(255, 255, 255, 0.09);  /* light frosted glass     */
+  --surface:   rgba(255, 255, 255, 0.07);  /* light frosted glass     */
   --border:    rgba(255, 255, 255, 0.12);  /* reflective 1px edge     */
   --text:      #E6ECFA;                    /* Clarity White           */
   --muted:     #93A5CE;                    /* blue-biased muted       */
@@ -138,7 +138,7 @@ a:hover { text-decoration: underline; }
   width: 100%;
   aspect-ratio: 16/9;
   overflow: hidden;
-  background: #111;
+  background: rgba(10,20,40,.45);
 }
 .card-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .card-thumb-placeholder {
@@ -824,7 +824,7 @@ a:hover { text-decoration: underline; }
   /* Translucent darkening overlay only — the photo lives on <html> and must
      show through. A class selector beats the element `body` rule, so this
      must stay transparent or it paints over the canvas. */
-  background: linear-gradient(180deg, rgba(6,11,24,.70) 0%, rgba(8,14,30,.50) 45%, rgba(6,11,24,.78) 100%);
+  background: linear-gradient(180deg, rgba(6,11,24,.85) 0%, rgba(8,14,30,.78) 50%, rgba(6,11,24,.90) 100%);
   margin: 0;
   padding: 0;
 }
@@ -916,7 +916,7 @@ a:hover { text-decoration: underline; }
   flex-direction: column;
   border-right: 1px solid var(--border);
   padding: 16px 10px;
-  background: #09090f;
+  background: transparent;
   gap: 4px;
   overflow-y: auto;
 }
@@ -956,6 +956,7 @@ a:hover { text-decoration: underline; }
 
 /* ── Right stats bar ── */
 .dash-stats {
+  /* transparent: stat-card children carry the glass */
   width: 180px;
   flex-shrink: 0;
   border-left: 1px solid var(--border);
@@ -963,7 +964,7 @@ a:hover { text-decoration: underline; }
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #09090f;
+  background: transparent;
   overflow-y: auto;
   min-height: 0;
 }
@@ -1016,7 +1017,8 @@ a:hover { text-decoration: underline; }
 }
 
 .cal-cell {
-  background: var(--bg);
+  /* translucent so the canvas shows faintly */
+  background: rgba(8,16,34,.42);
   min-height: 130px;
   padding: 6px;
   display: flex;
@@ -1024,8 +1026,8 @@ a:hover { text-decoration: underline; }
   gap: 4px;
   position: relative;
 }
-.cal-cell-pad { background: #0b0b0f; }
-.cal-cell-today { background: #0c0c1a; }
+.cal-cell-pad { background: rgba(4,8,20,.5); }
+.cal-cell-today { background: rgba(61,107,255,.14); }
 
 .cal-date-num {
   font-size: 12px;
@@ -1768,7 +1770,7 @@ a:hover { text-decoration: underline; }
 }
 
 .pipeline-thumb-empty {
-  background: #1f2a40;
+  background: rgba(20,32,58,.5);
 }
 
 .pipeline-copy {
@@ -1860,13 +1862,13 @@ a:hover { text-decoration: underline; }
   position: relative;
   width: 100%;
   aspect-ratio: 16/9;
-  background: #111;
+  background: rgba(10,20,40,.45);
   overflow: hidden;
 }
 .pipeline-card-thumb img {
   width: 100%; height: 100%; object-fit: cover; display: block;
 }
-.pipeline-card-no-thumb { width: 100%; height: 100%; background: #1a1f2e; }
+.pipeline-card-no-thumb { width: 100%; height: 100%; background: rgba(20,30,54,.5); }
 .pipeline-card-step {
   position: absolute;
   bottom: 5px; left: 5px;
@@ -2072,7 +2074,7 @@ a:hover { text-decoration: underline; }
 
 /* ── Control Center ── */
 .control-center {
-  background: linear-gradient(160deg, #121828, #0e1420);
+  background: var(--surface);
   border: 1px solid #23304f;
   border-radius: 12px;
   padding: 14px;
@@ -2419,7 +2421,7 @@ a:hover { text-decoration: underline; }
   width: 100%;
   aspect-ratio: 16/9;
   overflow: hidden;
-  background: #111;
+  background: rgba(10,20,40,.45);
 }
 .trending-thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .trending-info { padding: 10px; display: flex; flex-direction: column; gap: 4px; }
@@ -2451,7 +2453,7 @@ a:hover { text-decoration: underline; }
   width: 100%;
   aspect-ratio: 16/9;
   overflow: hidden;
-  background: #111;
+  background: rgba(10,20,40,.45);
 }
 .research-thumb-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .research-thumb-title { font-size: 11px; color: var(--muted); padding: 7px 8px; line-height: 1.4; }
@@ -2641,7 +2643,7 @@ a:hover { text-decoration: underline; }
   width: auto;
   border-radius: 6px;
   object-fit: contain;
-  background: #111;
+  background: rgba(10,20,40,.45);
 }
 
 @media (max-width: 700px) {
@@ -2694,7 +2696,7 @@ html {
   background: #060B18 url("ambient-bg.jpg") center / cover no-repeat fixed;
 }
 body {
-  background: linear-gradient(180deg, rgba(6,11,24,.70) 0%, rgba(8,14,30,.50) 45%, rgba(6,11,24,.78) 100%);
+  background: linear-gradient(180deg, rgba(6,11,24,.85) 0%, rgba(8,14,30,.78) 50%, rgba(6,11,24,.90) 100%);
   background-attachment: fixed;
 }
 body::before {
