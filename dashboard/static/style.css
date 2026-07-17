@@ -2679,27 +2679,33 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover { opacity:
    Grounds get the after-sunset gradient; primary containers become Dusk
    Glass (translucent, blurred, hairline light edge), the material the
    product's own Now Playing overlay already uses. */
-body {
-  background: linear-gradient(180deg, #060B18 0%, #0A1530 55%, #102448 100%);
-  background-attachment: fixed;
+/* Layer sandwich (order matters): the base gradient must live on <html>,
+   body must be transparent, and the mesh paints on body::before at z -1.
+   With the gradient on <body> itself, the ::before layer renders BEHIND
+   the page background and the light field is invisible: panels then have
+   nothing to frost and read as 100% opaque. */
+html {
+  background: linear-gradient(180deg, #060B18 0%, #0A1530 55%, #102448 100%) fixed;
 }
+body { background: transparent; }
 
-/* Ambient light field BEHIND the glass. This is what the blur frosts:
-   without visible light back here, translucent panels read as solid walls. */
+/* Layer 1, the canvas: vibrant mesh of sapphire, royal purple, indigo.
+   This is what bleeds through the 45%-opacity glass above it. */
 body::before {
   content: ""; position: fixed; inset: -20%; z-index: -1; pointer-events: none;
-  filter: blur(70px);
+  filter: blur(60px);
   background:
-    radial-gradient(circle at 14% 10%, rgba(61,107,255,.50), transparent 26%),
-    radial-gradient(circle at 86% 26%, rgba(124,92,255,.40), transparent 24%),
-    radial-gradient(circle at 45% 96%, rgba(42,120,255,.45), transparent 26%),
-    radial-gradient(circle at 90% 88%, rgba(232,168,92,.28), transparent 18%);
+    radial-gradient(circle at 14% 8%,  rgba(61,107,255,.65), transparent 27%),
+    radial-gradient(circle at 85% 22%, rgba(124,92,255,.58), transparent 25%),
+    radial-gradient(circle at 50% 45%, rgba(88,70,255,.50),  transparent 26%),
+    radial-gradient(circle at 45% 96%, rgba(42,120,255,.60), transparent 27%),
+    radial-gradient(circle at 90% 88%, rgba(232,168,92,.34), transparent 18%);
 }
 
 .step-panel, .login-card, .project-card, .pipeline-card, .stat-card,
 .ob-section, .research-section, .list-view, .suno-panel, .navbar {
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(25px);
+  backdrop-filter: blur(25px);
   border-top-color: rgba(255,255,255,.16);    /* bevel: light from above-left */
   border-left-color: rgba(255,255,255,.11);
   border-bottom-color: rgba(4,8,20,.60);      /* bevel: shade below-right */
