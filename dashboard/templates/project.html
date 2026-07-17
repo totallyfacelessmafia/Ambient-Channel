@@ -484,20 +484,6 @@
       <div class="error-banner">{{ project.task.error }}</div>
       {% endif %}
 
-      {% if project.files.final_video %}
-      <!-- Video exists from a previous build — offer to skip re-render -->
-      <div class="success-banner" style="margin-bottom:16px">
-        <p>&#10003; A completed video already exists.</p>
-        <p class="final-path">{{ project.files.final_video }}</p>
-      </div>
-      <div class="action-row" style="margin-bottom:20px; flex-wrap:wrap; gap:8px">
-        <button class="btn btn-primary" onclick="proceedToStep4('{{ project.id }}')">
-          Use This Video &rarr; SEO &amp; Upload
-        </button>
-        <span style="font-size:13px; color:var(--muted); align-self:center">or re-render below to use the updated loop</span>
-      </div>
-      {% endif %}
-
       <!-- Optional: music generation (Stable Audio via fal.ai) -->
       <div class="suno-panel">
         <div class="suno-panel-header">
@@ -560,6 +546,21 @@
         </div>
       </form>
       <p class="hint">Estimated time: 10&mdash;15 minutes</p>
+
+      {% if project.files.final_video %}
+      <!-- Video exists from a previous build — pipeline order: build above, proceed below -->
+      <div class="success-banner" style="margin-top:20px; margin-bottom:12px">
+        <p>&#10003; A completed video already exists.</p>
+        <p class="final-path">{{ project.files.final_video }}</p>
+      </div>
+      <div class="action-row" style="flex-wrap:wrap; gap:8px">
+        <button class="btn btn-primary" onclick="proceedToStep4('{{ project.id }}')">
+          Use This Video &rarr; SEO &amp; Upload
+        </button>
+        <span style="font-size:13px; color:var(--muted); align-self:center">
+          (Start Build above re-renders and replaces it)</span>
+      </div>
+      {% endif %}
     {% endif %}
   </div><!-- /step3 -->
 
@@ -848,7 +849,16 @@
   function proceedToStep4(pid) {
     fetch(`/project/${pid}/step3/approve`, { method: 'POST' })
       .then(r => r.json())
-      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error || 'Could not proceed.'); } });
+      .then(j => {
+        if (j.ok) {
+          // Land on the Step 4 panel after reload — otherwise the page looks
+          // unchanged and the click appears to have done nothing.
+          location.hash = 'step4-panel';
+          location.reload();
+        } else {
+          alert(j.error || 'Could not proceed.');
+        }
+      });
   }
 
   // ── Step 4 — SEO & Upload ─────────────────────────────────────────────────
