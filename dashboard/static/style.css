@@ -2641,3 +2641,33 @@ a:hover { text-decoration: underline; }
 @media (max-width: 700px) {
   .overlay-style-grid { grid-template-columns: 1fr; }
 }
+
+/* ── Native date/time inputs — themed like every other input ─────────────
+   color-scheme: dark makes the browser render its native popup calendar,
+   clock, and field internals in dark mode instead of a white early-2000s
+   widget floating over a dark UI. */
+:root { color-scheme: dark; }
+
+input[type="datetime-local"],
+input[type="date"],
+input[type="time"] {
+  color-scheme: dark;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 14px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+input[type="datetime-local"]:focus,
+input[type="date"]:focus,
+input[type="time"]:focus { outline: none; border-color: var(--accent); }
+
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.75);
+  opacity: 0.8;
+}
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover { opacity: 1; }
