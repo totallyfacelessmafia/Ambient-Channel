@@ -253,8 +253,12 @@ def _run_project_inner(pid: str) -> bool:
                                     "loop_chosen_slot": "a"})
 
     # ── Stage 2b: fresh music (optional; degrade to pool) ───────────────
+    # Skipped when the video is already built — new tracks can't get into a
+    # finished render, they'd just be spend into the pool.
     fresh = int(cfg.get("fresh_tracks", 5) or 0)
-    if fresh > 0 and not project.get("autopilot_music_done"):
+    project = state.get_project(pid)
+    if (fresh > 0 and not project.get("autopilot_music_done")
+            and not project.get("files", {}).get("final_video")):
         import seo_generator as sg
         prompt = chan.get("music_style") or "ambient, deep, slow, instrumental"
         try:
