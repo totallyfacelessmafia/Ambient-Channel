@@ -797,6 +797,16 @@ def _run_step3(pid: str) -> None:
         VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
         final_out = VIDEOS_DIR / f"{slug}_1hr.mp4"
 
+        # Preflight: a 1-hour 1080p render needs several GB — fail in one
+        # second with a clear message, not 79s in with an empty ffmpeg error.
+        import shutil as _shutil
+        free_gb = _shutil.disk_usage(VIDEOS_DIR).free / 1e9
+        if free_gb < 8:
+            raise RuntimeError(
+                f"Not enough disk space to render: {free_gb:.1f} GB free on "
+                f"{VIDEOS_DIR} — need ~8 GB. Free up space and re-run."
+            )
+
         # Skip macOS AppleDouble sidecars ("._x.mp3") — invisible in Finder/ls
         # on external volumes but returned by glob, and not real audio.
         mp3_files = [p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._")]
