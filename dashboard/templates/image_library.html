@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>UltraFocusZone &mdash; Image Library</title>
+  <title>AmbiHub · Image Library</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=4">
   <style>
     .lib-main { padding: 28px 32px; max-width: 1300px; }
@@ -144,7 +144,7 @@
 <body class="dashboard-body">
 
 <header class="dash-header">
-  <a class="dash-brand" href="/">&#9889; UltraFocusZone</a>
+  <a class="dash-brand" href="/"><span class="logo-bolt">&#9889;</span> Ambi<span class="logo-hub">Hub</span></a>
   <div class="dash-header-right">
     <span class="nav-user">{{ session.user }}</span>
     <a class="btn btn-ghost btn-sm" href="{{ url_for('onboarding') }}">Channel Setup</a>

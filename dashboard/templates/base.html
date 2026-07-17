@@ -7,29 +7,47 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <nav class="navbar">
-    <a class="nav-brand" href="{{ url_for('index') }}">⚡ AmbiHub</a>
-    {% if session.user %}
-    <div class="nav-right">
-      <a class="nav-link {% if request.path == '/research' %}nav-link-active{% endif %}"
-         href="{{ url_for('research_page') }}">
-        Research
-        {% if g.research_unseen > 0 %}
-        <span class="nav-badge">{{ g.research_unseen }}</span>
-        {% endif %}
-      </a>
-      <span class="nav-user">{{ session.user }}</span>
-      <a class="btn btn-primary btn-sm" href="{{ url_for('new_project_form') }}">+ New Project</a>
-      <form method="POST" action="{{ url_for('logout') }}" style="display:inline">
-        <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
-      </form>
-    </div>
-    {% endif %}
-  </nav>
+  {% if session.user %}
+  <div class="app-frame">
+    <header class="app-header">
+      <a class="logo" href="{{ url_for('index') }}">
+        <span class="logo-bolt">⚡</span> Ambi<span class="logo-hub">Hub</span></a>
+      <div class="htools">
+        <a class="btn btn-primary btn-sm" href="{{ url_for('new_project_form') }}">+ New Project</a>
+        <span class="nav-user">{{ session.user }}</span>
+        <form method="POST" action="{{ url_for('logout') }}" style="display:inline">
+          <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
+        </form>
+      </div>
+    </header>
 
+    <div class="app-body">
+      <nav class="app-side" aria-label="Main">
+        <a class="side-item {% if request.endpoint == 'index' %}active{% endif %}"
+           href="{{ url_for('index') }}"><span class="ico">⌂</span> Home</a>
+        <a class="side-item {% if request.endpoint == 'research_page' %}active{% endif %}"
+           href="{{ url_for('research_page') }}"><span class="ico">◎</span> Research
+          {% if g.research_unseen > 0 %}<span class="nav-badge">{{ g.research_unseen }}</span>{% endif %}</a>
+        <a class="side-item {% if request.endpoint == 'image_library_page' %}active{% endif %}"
+           href="{{ url_for('image_library_page') }}"><span class="ico">▦</span> Image Library</a>
+        <a class="side-item {% if request.endpoint == 'onboarding' %}active{% endif %}"
+           href="{{ url_for('onboarding') }}"><span class="ico">✦</span> Channel Setup</a>
+        <div class="side-spacer"></div>
+        <div class="side-foot">Signed in as<br><b>{{ session.user }}</b></div>
+      </nav>
+
+      <main class="app-main">
+        <div class="container">
+          {% block content %}{% endblock %}
+        </div>
+      </main>
+    </div>
+  </div>
+  {% else %}
   <main class="container">
-    {% block content %}{% endblock %}
+    {{ self.content() }}
   </main>
+  {% endif %}
 
   <script src="{{ url_for('static', filename='app.js') }}"></script>
   {% block scripts %}{% endblock %}
