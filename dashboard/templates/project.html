@@ -434,11 +434,15 @@
     {% if project.step < 3 %}
       <p class="locked-msg">Complete Steps 1 &amp; 2 first.</p>
 
-    {% elif project.status == 'running' and project.task.step_running == '2b' %}
-      <!-- Suno running -->
+    {% elif project.status == 'running' and project.task.step_running in ('2b', '2b_stable_audio') %}
+      <!-- Music generation running -->
       <div class="task-running">
         <div class="spinner"></div>
+        {% if project.task.step_running == '2b' %}
         <span>Generating music via Suno &mdash; Chrome is open, do not close it&hellip;</span>
+        {% else %}
+        <span>Generating music tracks &mdash; each track takes a few minutes; progress below&hellip;</span>
+        {% endif %}
         <span class="elapsed" id="elapsed">0:00</span>
       </div>
       <div class="progress-bar-wrap">
@@ -494,19 +498,19 @@
       </div>
       {% endif %}
 
-      <!-- Optional: Suno music generation -->
+      <!-- Optional: music generation (Stable Audio via fal.ai) -->
       <div class="suno-panel">
         <div class="suno-panel-header">
-          <h3>Generate Music via Suno</h3>
+          <h3>Generate Music</h3>
           <span class="badge-optional">Optional</span>
           <span style="margin-left:auto; font-size:13px; color:var(--muted)">
             {{ song_total }} track{{ 's' if song_total != 1 else '' }} in music/ folder
           </span>
         </div>
         <p class="hint" style="margin-bottom:12px">
-          Generates ~18 ambient tracks via Suno.ai into your music/ folder.
-          Skip if you already have tracks there.
-          Chrome will open on your desktop &mdash; takes 10&mdash;30 minutes.
+          Generates ~18 three-minute ambient tracks via fal.ai Stable Audio into
+          your music/ folder. Skip if you already have tracks there.
+          Runs in the background (~30&mdash;60 minutes) &mdash; progress appears here.
         </p>
         <div class="action-row" style="flex-wrap:wrap; gap:10px; align-items:flex-end; margin-top:0">
           <div class="form-group" style="margin:0; flex:1; min-width:200px">
@@ -514,7 +518,7 @@
             <input type="text" id="suno-prompt" value="electronic, ambient, deep, slow, warm, instrumental"
                    style="width:100%">
           </div>
-          <button class="btn btn-ghost" onclick="startSuno('{{ project.id }}')">
+          <button class="btn btn-ghost" id="suno-generate-btn" onclick="startSuno('{{ project.id }}')">
             Generate Music
           </button>
         </div>
@@ -814,11 +818,21 @@
   function startSuno(pid) {
     const prompt = document.getElementById('suno-prompt').value.trim();
     if (!prompt) { alert('Enter a music style first.'); return; }
+    // Immediate feedback — the task starts in the background and the page
+    // reloads into the progress view, but the click must visibly register.
+    const btn = document.getElementById('suno-generate-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }
     const fd = new FormData();
     fd.append('suno_prompt', prompt);
     fetch(`/project/${pid}/step2b/start`, { method: 'POST', body: fd })
       .then(r => r.json())
-      .then(j => { if (j.ok) { location.reload(); } else { alert(j.error); } });
+      .then(j => {
+        if (j.ok) { location.reload(); }
+        else {
+          alert(j.error);
+          if (btn) { btn.disabled = false; btn.textContent = 'Generate Music'; }
+        }
+      });
   }
 
   function startStep3(pid) {

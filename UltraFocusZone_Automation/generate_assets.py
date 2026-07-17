@@ -911,22 +911,22 @@ def generate_music_stable_audio(
 
     os.environ["FAL_KEY"] = load_fal_key()
 
+    # Stable Audio 2.5 — the original fal-ai/stable-audio endpoint now caps
+    # seconds_total at 47, which is useless for 3-minute ambient tracks.
     arguments: dict = {
         "prompt":        prompt,
-        "seconds_start": 0,
-        "seconds_total": min(float(duration), 190.0),
-        "steps":         100,
+        "seconds_total": int(min(float(duration), 190.0)),
     }
     if seed is not None:
         arguments["seed"] = seed
 
-    print(f"  Generating track via Stable Audio ({duration}s, seed={seed})...")
+    print(f"  Generating track via Stable Audio 2.5 ({duration}s, seed={seed})...")
     result = _fal_call(
-        lambda: fal_client.run("fal-ai/stable-audio", arguments=arguments),
+        lambda: fal_client.run("fal-ai/stable-audio-25/text-to-audio", arguments=arguments),
         "Stable Audio generation", timeout_sec=360, attempts=2,
     )
 
-    audio_url = (result.get("audio_file") or {}).get("url", "")
+    audio_url = ((result.get("audio") or result.get("audio_file") or {}).get("url", ""))
     if not audio_url:
         raise RuntimeError(f"Stable Audio returned no audio URL. Raw result: {result}")
 
