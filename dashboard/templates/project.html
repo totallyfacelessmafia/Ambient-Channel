@@ -568,15 +568,18 @@
        STEP 4 — SEO & YouTube Upload
   ================================================================ -->
   {% set yt = project.youtube %}
-  <div class="step-panel {% if project.status != 'done' and yt.upload_status not in ('uploading','done','error') %}step-panel-locked{% endif %}"
+  {# Unlock by pipeline position (step), not by transient status — status
+     flips from 'done' to 'idle' the moment Step 3 is approved, which used
+     to re-lock this panel exactly when the user arrived at it. #}
+  <div class="step-panel {% if project.step < 4 and yt.upload_status not in ('uploading','done','error') %}step-panel-locked{% endif %}"
        id="step4-panel">
     <div class="step-panel-header">
       <h2>Step 4 &mdash; SEO &amp; YouTube Upload</h2>
       {% if yt.upload_status == 'done' %}<span class="badge badge-done">Uploaded</span>
-      {% elif project.status != 'done' and yt.upload_status not in ('uploading','error') %}<span class="badge badge-locked">Locked</span>{% endif %}
+      {% elif project.step < 4 and yt.upload_status not in ('uploading','error') %}<span class="badge badge-locked">Locked</span>{% endif %}
     </div>
 
-    {% if project.status != 'done' and yt.upload_status not in ('uploading','done','error') %}
+    {% if project.step < 4 and yt.upload_status not in ('uploading','done','error') %}
       <p class="locked-msg">Complete Step 3 first.</p>
 
     {% elif project.task.step_running == '4seo' and project.task.running %}
