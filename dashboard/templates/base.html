@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}UltraFocusZone Dashboard{% endblock %}</title>
+  <title>{% block title %}AmbiHub{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <nav class="navbar">
-    <a class="nav-brand" href="{{ url_for('index') }}">⚡ UltraFocusZone</a>
+    <a class="nav-brand" href="{{ url_for('index') }}">⚡ AmbiHub</a>
     {% if session.user %}
     <div class="nav-right">
       <a class="nav-link {% if request.path == '/research' %}nav-link-active{% endif %}"

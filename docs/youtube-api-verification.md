@@ -1,6 +1,6 @@
 # YouTube API Verification & Audit Package
 
-Everything needed to take ChannelForge from "uploads locked private, 100 users,
+Everything needed to take AmbiHub from "uploads locked private, 100 users,
 ~6 uploads/day" to a compliant multi-tenant publisher. Two separate processes,
 both required; the audit is the longest external clock in the launch plan —
 file both as early as possible.
@@ -14,18 +14,18 @@ file both as early as possible.
 
 ## Prerequisites (blockers for filing — need CARLOS input)
 
-- [ ] **Public domain** for the product: `[DOMAIN]` (e.g. channelforge.app).
-      Decision needed: which domain. Can be parked on existing hosting from
-      the other apps — only two static pages are required to file.
+- [x] **Public domain** for the product: `ambihub.ai` — DECIDED 2026-07-17
+      (AmbiHub; ambihub.io optional defensive grab). Can be parked on existing
+      hosting from the other apps — only two static pages are required to file.
 - [ ] **Domain verified in Google Search Console** under the same Google
       account that owns the Cloud project.
-- [ ] **Privacy policy live** at `https://[DOMAIN]/privacy` — content already
+- [ ] **Privacy policy live** at `https://ambihub.ai/privacy` — content already
       exists in `dashboard/templates/privacy.html` (includes the YouTube API
       Services section); needs static export to the public domain.
-- [ ] **Terms live** at `https://[DOMAIN]/terms` — same, from `terms.html`.
+- [ ] **Terms live** at `https://ambihub.ai/terms` — same, from `terms.html`.
 - [ ] **OAuth consent screen** (Cloud Console → APIs & Services): app name
-      ChannelForge, support email, logo, homepage `https://[DOMAIN]`,
-      privacy + terms URLs above, authorized domain `[DOMAIN]`.
+      AmbiHub, support email, logo, homepage `https://ambihub.ai`,
+      privacy + terms URLs above, authorized domain `ambihub.ai`.
 - [ ] **Unlisted demo video** (script below) uploaded to any YouTube channel.
 
 ## Scopes requested
@@ -35,7 +35,7 @@ file both as early as possible.
 
 ### Draft justification — youtube.upload
 
-> ChannelForge is a video-production tool for YouTube creators. After a user
+> AmbiHub is a video-production tool for YouTube creators. After a user
 > connects their own channel via OAuth, the app renders long-form ambient
 > music videos the user has configured and uploads them to that user's own
 > channel on the user's schedule. The youtube.upload scope is used solely to
@@ -57,8 +57,8 @@ file both as early as possible.
 
 ## Demo video script (3–4 minutes, unlisted, screen recording)
 
-1. Show `https://[DOMAIN]` homepage with the app name visible.
-2. Log into ChannelForge → click "Connect YouTube."
+1. Show `https://ambihub.ai` homepage with the app name visible.
+2. Log into AmbiHub → click "Connect YouTube."
 3. Show the FULL Google consent screen — URL bar visible, app name and both
    scopes readable. Approve.
 4. Create a video project; show the user choosing the publish schedule.
@@ -71,7 +71,7 @@ file both as early as possible.
 
 Draft answers to the core questions:
 
-- **What does your application do?** ChannelForge automates production of
+- **What does your application do?** AmbiHub automates production of
   long-form ambient/focus-music videos for YouTube creators: AI-generated
   imagery and music are assembled into videos on the creator's own machine
   or our hosted service, then uploaded to the creator's own connected
@@ -97,7 +97,7 @@ Draft answers to the core questions:
 
 ## Filing order
 
-1. Carlos picks `[DOMAIN]` → static privacy/terms pages go live → Search
+1. Carlos picks `ambihub.ai` → static privacy/terms pages go live → Search
    Console verification.
 2. Complete OAuth consent screen → submit sensitive-scope verification with
    demo video + justifications above.

@@ -1,11 +1,11 @@
 @echo off
 setlocal
-title ChannelForge — First-Time Setup
+title AmbiHub — First-Time Setup
 color 0A
 
 echo.
 echo  ============================================
-echo   ChannelForge — First-Time Setup
+echo   AmbiHub — First-Time Setup
 echo  ============================================
 echo.
 
@@ -72,7 +72,7 @@ if errorlevel 1 (
 
 echo.
 echo  ============================================
-echo   Setup complete! Run ChannelForge.bat to start.
+echo   Setup complete! Run AmbiHub.bat to start.
 echo  ============================================
 echo.
 pause

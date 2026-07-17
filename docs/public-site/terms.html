@@ -4,15 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Terms of Service — AmbiHub</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='home.css') }}">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/static/home.css">
 </head>
 <body class="home-body">
   <nav class="home-nav">
     <a class="home-nav-brand" href="/">&#9889; AmbiHub</a>
     <div class="home-nav-right">
-      <a href="{{ url_for('login_page') }}" class="btn btn-ghost btn-sm">Sign In</a>
-      <a href="{{ url_for('register_page') }}" class="btn btn-primary btn-sm">Get Started</a>
+      <a href="https://ambihub.ai" class="btn btn-ghost btn-sm">Sign In</a>
+      <a href="/register" class="btn btn-primary btn-sm">Get Started</a>
     </div>
   </nav>
 

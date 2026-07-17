@@ -1,5 +1,5 @@
 """
-auth.py — Session-cookie authentication for the ChannelForge dashboard.
+auth.py — Session-cookie authentication for the AmbiHub dashboard.
 
 Supports self-service registration, password reset tokens, and email
 verification stubs (enforcement can be toggled later).
