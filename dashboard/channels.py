@@ -48,6 +48,16 @@ def _channel_default() -> dict:
         "music_style":        "electronic, ambient, deep, slow, warm, instrumental",
         "overlay_style":      "default",  # "default" | "minimal" | "none"
         "logo_filename":      "",          # PNG or GIF filename in logos/<cid>/
+        "autopilot": {                     # hands-free cadence (autopilot.py)
+            "enabled":          False,
+            "videos_per_week":  3,
+            "days":             ["mon", "wed", "fri"],
+            "publish_hour_utc": 14,
+            "loop_model":       "kling_v16",   # tier capability map hook
+            "fresh_tracks":     5,             # Stable Audio tracks per video
+            "song_count":       18,
+            "lead_hours":       36,            # veto window before publishAt
+        },
         "updated_at":         "",
     }
 

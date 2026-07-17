@@ -18,6 +18,7 @@ from flask import (Flask, abort, g, jsonify, redirect, render_template,
                    request, send_file, session, url_for)
 
 import auth
+import autopilot
 import channel_profile
 import channels as ch
 import state
@@ -1197,6 +1198,54 @@ def oauth_revoke():
 
 # ── Suggest next slot ──────────────────────────────────────────────────────
 
+@app.route("/project/<pid>/autopilot/run", methods=["POST"])
+@auth.login_required
+def autopilot_run(pid):
+    """Run the full hands-free pipeline on one project."""
+    project = state.get_project(pid)
+    if project is None:
+        return jsonify(ok=False, error="Project not found"), 404
+    if not autopilot.start_run_async(pid):
+        return jsonify(ok=False, error="Autopilot is already running a project.")
+    return jsonify(ok=True)
+
+
+@app.route("/api/autopilot/status")
+@auth.login_required
+def autopilot_status():
+    return jsonify(ok=True, **autopilot.current_run())
+
+
+@app.route("/api/channel/<cid>/autopilot", methods=["POST"])
+@auth.login_required
+def channel_autopilot_config(cid):
+    """Save a channel's cadence config (enabled, days, models, lead time)."""
+    chan = ch.get_channel(cid)
+    if chan is None:
+        return jsonify(ok=False, error="Channel not found"), 404
+    cfg = dict(chan.get("autopilot") or {})
+    f = request.form
+    if "enabled" in f:
+        cfg["enabled"] = f.get("enabled", "").lower() in ("1", "true", "on", "yes")
+    if "days" in f:
+        cfg["days"] = [d.strip().lower() for d in f.get("days", "").split(",")
+                       if d.strip().lower() in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")]
+        cfg["videos_per_week"] = len(cfg["days"])
+    for key, cast in (("publish_hour_utc", int), ("fresh_tracks", int),
+                      ("song_count", int), ("lead_hours", float)):
+        if key in f:
+            try:
+                cfg[key] = cast(f.get(key))
+            except (TypeError, ValueError):
+                pass
+    if "loop_model" in f and f.get("loop_model") in (
+            "kling_v16", "kling_v21", "seedance_lite", "hailuo_pro", "seedance_pro"):
+        cfg["loop_model"] = f.get("loop_model")
+    chan["autopilot"] = cfg
+    ch.save_channel(cid, chan)
+    return jsonify(ok=True, autopilot=cfg)
+
+
 @app.route("/api/suggest-slot")
 @auth.login_required
 def api_suggest_slot():
@@ -1570,4 +1619,6 @@ def research_add_channel():
 if __name__ == "__main__":
     _port = int(os.environ.get("PORT", 5000))
     _debug = os.environ.get("FLASK_ENV") != "production"
+    if os.environ.get("AUTOPILOT_SCHEDULER", "1") != "0":
+        autopilot.start_scheduler()
     app.run(debug=_debug, port=_port, host="0.0.0.0", use_reloader=False)

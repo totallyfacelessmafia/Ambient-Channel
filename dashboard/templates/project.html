@@ -47,6 +47,20 @@
     </div>
   </div>
 
+  <!-- Autopilot: run every remaining step hands-free -->
+  {% if project.youtube.upload_status != 'done' %}
+  <div class="action-row" style="margin:6px 0 14px; align-items:center; gap:10px">
+    <button class="btn btn-ghost btn-sm" id="autopilot-btn"
+            onclick="runAutopilot('{{ project.id }}')">
+      &#9889; Run Autopilot
+    </button>
+    <span style="font-size:12px; color:var(--muted)">
+      Completes every remaining step automatically and schedules the upload
+      as private &mdash; you can veto before it goes live. Uses AI credits.
+    </span>
+  </div>
+  {% endif %}
+
   <!-- ================================================================
        STEP 1 &mdash; Generate AI Image
   ================================================================ -->
@@ -847,6 +861,21 @@
     fetch(`/project/${pid}/step3/start`, { method: 'POST', body: data })
       .then(r => r.json())
       .then(j => { if (j.ok) { location.reload(); } else { alert(j.error); } });
+  }
+
+  function runAutopilot(pid) {
+    if (!confirm('Run Autopilot?\n\nIt will make every remaining decision automatically (image, title, loop, music, build, SEO), then upload as PRIVATE with a scheduled publish time.\n\nThis spends AI credits. Continue?')) return;
+    const btn = document.getElementById('autopilot-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Autopilot running…'; }
+    fetch(`/project/${pid}/autopilot/run`, { method: 'POST' })
+      .then(r => r.json())
+      .then(j => {
+        if (j.ok) { startPolling(pid); }
+        else {
+          alert(j.error || 'Could not start autopilot.');
+          if (btn) { btn.disabled = false; btn.textContent = '⚡ Run Autopilot'; }
+        }
+      });
   }
 
   function proceedToStep4(pid) {
