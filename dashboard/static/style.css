@@ -821,7 +821,10 @@ a:hover { text-decoration: underline; }
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: var(--bg);
+  /* Translucent darkening overlay only — the photo lives on <html> and must
+     show through. A class selector beats the element `body` rule, so this
+     must stay transparent or it paints over the canvas. */
+  background: linear-gradient(180deg, rgba(6,11,24,.70) 0%, rgba(8,14,30,.50) 45%, rgba(6,11,24,.78) 100%);
   margin: 0;
   padding: 0;
 }
