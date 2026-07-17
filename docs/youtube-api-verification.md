@@ -2,8 +2,8 @@
 
 Everything needed to take AmbiHub from "uploads locked private, 100 users,
 ~6 uploads/day" to a compliant multi-tenant publisher. Two separate processes,
-both required; the audit is the longest external clock in the launch plan —
-file both as early as possible.
+both required; the audit is the longest external clock in the launch plan.
+File both as early as possible.
 
 | Process | Unlocks | Timeline |
 |---|---|---|
@@ -12,17 +12,17 @@ file both as early as possible.
 
 ---
 
-## Prerequisites (blockers for filing — need CARLOS input)
+## Prerequisites (blockers for filing, need CARLOS input)
 
-- [x] **Public domain** for the product: `ambihub.ai` — DECIDED 2026-07-17
+- [x] **Public domain** for the product: `ambihub.ai`, DECIDED 2026-07-17
       (AmbiHub; ambihub.io optional defensive grab). Can be parked on existing
-      hosting from the other apps — only two static pages are required to file.
+      hosting from the other apps, only two static pages are required to file.
 - [ ] **Domain verified in Google Search Console** under the same Google
       account that owns the Cloud project.
-- [ ] **Privacy policy live** at `https://ambihub.ai/privacy` — content already
+- [ ] **Privacy policy live** at `https://ambihub.ai/privacy`; content already
       exists in `dashboard/templates/privacy.html` (includes the YouTube API
       Services section); needs static export to the public domain.
-- [ ] **Terms live** at `https://ambihub.ai/terms` — same, from `terms.html`.
+- [ ] **Terms live** at `https://ambihub.ai/terms`, same, from `terms.html`.
 - [ ] **OAuth consent screen** (Cloud Console → APIs & Services): app name
       AmbiHub, support email, logo, homepage `https://ambihub.ai`,
       privacy + terms URLs above, authorized domain `ambihub.ai`.
@@ -33,7 +33,7 @@ file both as early as possible.
 - `https://www.googleapis.com/auth/youtube.upload` (sensitive)
 - `https://www.googleapis.com/auth/youtube` (sensitive)
 
-### Draft justification — youtube.upload
+### Draft justification, youtube.upload
 
 > AmbiHub is a video-production tool for YouTube creators. After a user
 > connects their own channel via OAuth, the app renders long-form ambient
@@ -45,7 +45,7 @@ file both as early as possible.
 > control. No content is uploaded to any channel other than the
 > authenticated user's own.
 
-### Draft justification — youtube
+### Draft justification, youtube
 
 > Used for three narrow functions on the authenticated user's own channel:
 > (1) setting the custom thumbnail for a video the app just uploaded
@@ -59,15 +59,15 @@ file both as early as possible.
 
 1. Show `https://ambihub.ai` homepage with the app name visible.
 2. Log into AmbiHub → click "Connect YouTube."
-3. Show the FULL Google consent screen — URL bar visible, app name and both
+3. Show the FULL Google consent screen with the URL bar visible, app name and both
    scopes readable. Approve.
 4. Create a video project; show the user choosing the publish schedule.
 5. Show the finished upload appearing in YouTube Studio as **Private
-   (Scheduled)** — demonstrating uploads target only the connected channel
+   (Scheduled)**, demonstrating uploads target only the connected channel
    and stay private until the user's chosen time.
 6. Show the disconnect/revoke path (Google account permissions page).
 
-## Compliance audit (YouTube API Services — Audit & Quota Extension Form)
+## Compliance audit (YouTube API Services, Audit & Quota Extension Form)
 
 Draft answers to the core questions:
 
@@ -102,6 +102,6 @@ Draft answers to the core questions:
 2. Complete OAuth consent screen → submit sensitive-scope verification with
    demo video + justifications above.
 3. Submit the YouTube Audit & Quota Extension Form immediately after (do
-   not wait for #2 to conclude — the audit is the longer clock).
+   not wait for #2 to conclude, the audit is the longer clock).
 4. Until both clear: keep customer count ≤ test users, and treat the
    private-lock as a hard launch gate for any "publishes for you" tier.
