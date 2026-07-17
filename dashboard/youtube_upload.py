@@ -204,10 +204,18 @@ def cancel_scheduled_publish(video_id: str, cid: str = "") -> dict:
     try:
         from googleapiclient.discovery import build
         youtube = build("youtube", "v3", credentials=creds)
-        # publishAt can only be cleared by rewriting the status resource.
+        # A part=status update REPLACES the whole status resource, so read the
+        # current one first and modify only the two fields we care about —
+        # otherwise writable fields like selfDeclaredMadeForKids get reset.
+        resp = youtube.videos().list(part="status", id=video_id).execute()
+        items = resp.get("items", [])
+        if not items:
+            return {"ok": False, "error": "Video not found on YouTube."}
+        status = items[0].get("status", {})
+        status["privacyStatus"] = "private"
+        status.pop("publishAt", None)
         youtube.videos().update(
-            part="status",
-            body={"id": video_id, "status": {"privacyStatus": "private"}},
+            part="status", body={"id": video_id, "status": status},
         ).execute()
         return {"ok": True, "error": None}
     except Exception as exc:  # noqa: BLE001
