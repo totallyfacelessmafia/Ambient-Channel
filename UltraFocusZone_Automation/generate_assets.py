@@ -572,22 +572,23 @@ def generate_ambient_loop(source: Path, output: Path, duration: int = 30) -> Non
 KLING_MOTION_PROMPT = (
     # SUBJECT
     "Empty modern architectural interior — no people, no humans, no persons, no figures, no silhouettes. "
-    "Architecture and all furniture are completely anchored and motionless. "
+    "Architecture, furniture, and every object inside the room are completely anchored and motionless — "
+    "the interior is a still photograph. "
     # CAMERA (rig metaphors — avoid vague words like 'cinematic')
     "Static shot, locked-off frame, zero camera movement, no lens drift, fixed tripod perspective. "
-    "The camera is bolted to the floor — no panning, no zooming, no tilting, no drift of any kind. "
-    # MOVEMENT (magnitude-controlled; water + low-level mist only)
-    "The only visible motion: subtle rhythmic ocean waves crashing gently in the distance; "
-    "shimmering dark water surface with gentle natural ripples on the pool; "
-    "fluid reflections moving extremely slowly. "
-    "Global motion is 5% — movement is barely perceptible, unhurried, real-world speed. "
-    "Soft atmospheric haze drifts linearly with zero global wind, "
-    "taking the full 10 seconds to cross the frame. "
+    "The camera is bolted to the floor — no panning, no zooming, no push-in, no tilting, no drift of any kind. "
+    "Framing and focal length are identical in the first frame and the last frame. "
+    # MOVEMENT — at most two barely-there sources, localized OUTSIDE the window
+    "The only visible motion, at barely perceptible magnitude (global motion 5%): "
+    "a faint slow swell on the distant water surface far outside the window, "
+    "and a very light sway in exterior trees and brush. "
+    "No waves crash. No splashing. Reflections stay almost completely still. "
+    "The window glass is perfectly still and clear. "
     # REAL-TIME enforcement
     "THIS IS REAL-TIME FOOTAGE — NOT a time-lapse, NOT accelerated, NOT sped up. "
     "Exactly 10 real seconds. Time of day does NOT change. "
     "Lighting, color temperature, and atmospheric density are completely frozen. "
-    "No sunrise, no sunset, no golden hour, no day-to-night transition. "
+    "No sunrise, no sunset, no golden hour, no day-to-night transition, no new light sources. "
     "Ultra-realistic, calm, serene ambient scene."
 )
 
@@ -612,7 +613,11 @@ KLING_NEGATIVE_PROMPT = (
     # People and other unwanted content
     "people, humans, persons, figures, silhouettes, bodies, faces, hands, "
     "fast motion, speed ramp, motion blur trails, "
-    "scene change, morphing, distortion, hallucination, random objects"
+    "scene change, morphing, distortion, hallucination, random objects, "
+    # Zoom variants + content the user has vetoed (2026-07: no zoom, minimal water)
+    "ken burns, slow zoom, gradual zoom, scale change, focal length change, "
+    "crashing waves, splashing, big waves, rough water, water on glass, rippling glass, "
+    "sun rays, sunbeams, light rays, sunlight entering room, interior lighting change"
 )
 
 # ── Seedance v1 prompt — [Scene] + [Motion], + [Motion], [Camera] + [Motion]
@@ -627,27 +632,34 @@ KLING_NEGATIVE_PROMPT = (
 SEEDANCE_PROMPT = (
     # [Scene]
     "Modern dark architectural interior, no people, no figures, no silhouettes. "
-    # [Motion] — describe only the moving element, with adverbs of degree
-    "Water surface gently ripples with subtle reflections, "
-    "subtle rhythmic waves crashing slowly on the distant shore, "
-    "thin wisps of morning mist drifting very slowly past the cliffs. "
+    # [Motion] — localized outside the window, with adverbs of degree.
+    # (Unlocalized "water surface ripples" once put ripples ON the window glass;
+    #  "morning mist" once summoned sunlight indoors — keep motion anchored and
+    #  time-of-day words out.)
+    "Far outside the window, the distant ocean surface swells extremely slowly — barely perceptible. "
+    "Exterior trees and brush sway very gently. "
+    "The window glass stays perfectly still and clear. "
+    "Everything inside the room stays completely still. "
     # [Camera] + [Motion reinforcement]
     "Fixed tripod perspective, locked-off frame, zero camera movement. "
     # Style / lighting continuity
-    "Maintain exact lighting and cool color temperature from the first frame. "
+    "Lighting stays exactly as in the first frame — same brightness, same cool color temperature, "
+    "no sunlight appears, no new light sources. "
     "Real-time footage, not accelerated, not a time-lapse."
 )
 
 # Hailuo: cinematic ambient description, keep it concise.
 HAILUO_PROMPT = (
     "Empty architectural scene — no people, no humans, no figures, no silhouettes. "
-    "Architecture and furniture are completely anchored and motionless. "
-    "Static shot, locked-off frame, zero camera movement, no lens drift, fixed tripod perspective. "
-    "The only visible motion: subtle rhythmic ocean waves crashing gently; "
-    "gentle natural ripples on the pool surface — barely perceptible, global motion is 5%. "
-    "Soft atmospheric haze drifts linearly with zero global wind. "
+    "Architecture, furniture, and everything inside the room are completely anchored and motionless. "
+    "Static shot, locked-off frame, zero camera movement, no zooming, no push-in, "
+    "no lens drift, fixed tripod perspective. "
+    "The only visible motion, barely perceptible (global motion 5%): "
+    "a faint slow swell on the distant water surface outside, "
+    "and a very light sway in exterior trees and brush. "
+    "No waves crash. The window glass stays perfectly still. "
     "Real-time footage — NOT a time-lapse, NOT accelerated. "
-    "Lighting, color temperature, and atmospheric density frozen exactly as shown. "
+    "Lighting, color temperature, and atmospheric density frozen exactly as shown — no new light sources. "
     "No sunrise, sunset, golden hour, or day-to-night. Calm, serene ambient scene."
 )
 
