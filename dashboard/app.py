@@ -27,6 +27,9 @@ import tasks
 import os
 
 app = Flask(__name__)
+# Flask's default tells browsers to cache static files for 12 hours, which
+# makes CSS/JS changes invisibly stale after every update. Serve fresh.
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 app.secret_key = os.environ.get("SECRET_KEY") or auth.get_secret_key()
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
