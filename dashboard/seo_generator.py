@@ -136,7 +136,12 @@ def generate_title(project: dict, profile: dict) -> str:
         # Pattern B — Identity Hook first (Browse algorithm trigger)
         pat_b = f"{hook}: Music for {activity} {yr} (1 Hour)"
         # Pattern C — "Deep [Activity]" formula
-        pat_c = f"Deep {activity} Music — {hook} {yr} (1 Hour)"
+        # Don't stutter when the activity already starts with "Deep"
+        # (autopilot's first live run titled a video "Deep Deep Work Music").
+        if activity.lower().startswith("deep"):
+            pat_c = f"{activity} Music — {hook} {yr} (1 Hour)"
+        else:
+            pat_c = f"Deep {activity} Music — {hook} {yr} (1 Hour)"
         # Pattern D — "Music for [Activity]" (exact match long-tail)
         pat_d = f"Music for {activity} — {hook} {yr} (1 Hour)"
         options = [pat_a, pat_b, pat_c, pat_d]
