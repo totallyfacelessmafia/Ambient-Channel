@@ -1191,7 +1191,51 @@ def project_veto(pid):
     result = yu.cancel_scheduled_publish(video_id, cid)
     if not result.get("ok"):
         return jsonify(ok=False, error=result.get("error") or "Could not cancel on YouTube.")
-    state.update_project(pid, youtube={"scheduled_publish_at": None, "vetoed": True})
+    state.update_project(pid, youtube={"scheduled_publish_at": None, "vetoed": True,
+                                       "privacy": "private"})
+    return jsonify(ok=True)
+
+
+@app.route("/project/<pid>/publish-now", methods=["POST"])
+@auth.login_required
+def project_publish_now(pid):
+    """Make an already-uploaded video public immediately."""
+    import youtube_upload as yu
+    project = state.get_project(pid)
+    if project is None:
+        return jsonify(ok=False, error="Project not found"), 404
+    video_id = project.get("youtube", {}).get("video_id")
+    if not video_id:
+        return jsonify(ok=False, error="This video hasn't been uploaded yet.")
+    result = yu.publish_now(video_id, project.get("channel_id", "") or "")
+    if not result.get("ok"):
+        return jsonify(ok=False, error=result.get("error") or "Could not publish on YouTube.")
+    state.update_project(pid, youtube={"scheduled_publish_at": None, "vetoed": False,
+                                       "privacy": "public"})
+    return jsonify(ok=True)
+
+
+@app.route("/project/<pid>/reschedule", methods=["POST"])
+@auth.login_required
+def project_reschedule(pid):
+    """Reschedule an already-uploaded video to a new future publish time."""
+    import youtube_upload as yu
+    project = state.get_project(pid)
+    if project is None:
+        return jsonify(ok=False, error="Project not found"), 404
+    video_id = project.get("youtube", {}).get("video_id")
+    if not video_id:
+        return jsonify(ok=False, error="This video hasn't been uploaded yet.")
+    publish_at = request.form.get("publish_at", "").strip()
+    local_date = request.form.get("local_date", "").strip()
+    if not publish_at:
+        return jsonify(ok=False, error="Pick a date and time to schedule for.")
+    result = yu.reschedule(video_id, publish_at, project.get("channel_id", "") or "")
+    if not result.get("ok"):
+        return jsonify(ok=False, error=result.get("error") or "Could not reschedule on YouTube.")
+    state.update_project(pid, youtube={"scheduled_publish_at": publish_at, "vetoed": False,
+                                       "privacy": "private"},
+                         scheduled_date=(local_date or tasks.utc_to_local_date(publish_at)))
     return jsonify(ok=True)
 
 

@@ -2920,3 +2920,20 @@ body:has(.app-frame) { overflow: hidden; }
 }
 .hv-await + .hv-await { margin-top: 14px; }
 .hv-await-sep { padding-top: 14px; border-top: 1px solid var(--border); }
+
+/* Post-upload publishing management panel */
+.publish-manage {
+  margin-top: 16px; padding: 18px 20px;
+  background: var(--surface);
+  -webkit-backdrop-filter: blur(25px); backdrop-filter: blur(25px);
+  border: 1px solid var(--border);
+  border-top-color: rgba(255,255,255,.16);
+  border-bottom-color: rgba(4,8,20,.6);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,.37);
+}
+.publish-manage h3 { font-size: 14px; font-weight: 600; margin: 0 0 8px; }
+.publish-state { font-size: 13.5px; color: var(--text); margin: 0 0 12px; }
+.publish-state b { font-weight: 600; }
+.manage-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.manage-controls input[type="datetime-local"] { min-width: 220px; }

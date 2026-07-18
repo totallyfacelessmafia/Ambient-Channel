@@ -190,11 +190,11 @@ def is_connected(cid: str = "") -> bool:
     return _get_valid_credentials(cid) is not None
 
 
-def cancel_scheduled_publish(video_id: str, cid: str = "") -> dict:
+def _set_video_status(video_id: str, cid: str, privacy: str, publish_at=None) -> dict:
     """
-    Veto a scheduled video: force it back to private and clear its publishAt,
-    so it will NOT go live at the scheduled time. The video stays on the
-    channel as a private draft (not deleted), so nothing is lost.
+    Read-modify-write the video's status resource, changing only privacyStatus
+    (and publishAt). Reading first preserves writable fields like
+    selfDeclaredMadeForKids that a part=status update would otherwise reset.
 
     Returns {"ok": bool, "error": str|None}.
     """
@@ -204,22 +204,39 @@ def cancel_scheduled_publish(video_id: str, cid: str = "") -> dict:
     try:
         from googleapiclient.discovery import build
         youtube = build("youtube", "v3", credentials=creds)
-        # A part=status update REPLACES the whole status resource, so read the
-        # current one first and modify only the two fields we care about —
-        # otherwise writable fields like selfDeclaredMadeForKids get reset.
         resp = youtube.videos().list(part="status", id=video_id).execute()
         items = resp.get("items", [])
         if not items:
             return {"ok": False, "error": "Video not found on YouTube."}
         status = items[0].get("status", {})
-        status["privacyStatus"] = "private"
-        status.pop("publishAt", None)
+        status["privacyStatus"] = privacy
+        if publish_at:
+            status["publishAt"] = publish_at
+        else:
+            status.pop("publishAt", None)
         youtube.videos().update(
             part="status", body={"id": video_id, "status": status},
         ).execute()
         return {"ok": True, "error": None}
     except Exception as exc:  # noqa: BLE001
         return {"ok": False, "error": str(exc)}
+
+
+def cancel_scheduled_publish(video_id: str, cid: str = "") -> dict:
+    """Veto: force the video private and clear publishAt so it won't go live.
+    The video stays as a private draft (not deleted)."""
+    return _set_video_status(video_id, cid, "private", publish_at=None)
+
+
+def publish_now(video_id: str, cid: str = "") -> dict:
+    """Make an uploaded video public immediately (clears any schedule)."""
+    return _set_video_status(video_id, cid, "public", publish_at=None)
+
+
+def reschedule(video_id: str, publish_at: str, cid: str = "") -> dict:
+    """Set an uploaded video to private + a future publishAt (goes live then).
+    publish_at is an ISO-8601 UTC string, e.g. 2026-08-01T14:00:00Z."""
+    return _set_video_status(video_id, cid, "private", publish_at=publish_at)
 
 
 # ---------------------------------------------------------------------------
