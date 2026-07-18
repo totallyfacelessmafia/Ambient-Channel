@@ -10,9 +10,13 @@ this module is the enforcement layer it plugs into, with no payment rails yet.
 Tier definitions come from the decided pricing plan:
   Starter $29 / 6 videos / 1 channel / Kling loops
   Growth  $69 / 15 videos / 3 channels / + mid models
-  Pro     $129 / 30 videos / unlimited channels / all models incl. Seedance Pro
+  Pro     $129 / 25 videos / unlimited channels / all models incl. Seedance Pro
 plus a watermarked Free trial tier and an internal Owner (operator) tier with
 no limits. `None` means unlimited.
+
+Pro is 25 (not 30) so the margin holds even when every video uses the most
+expensive config (Seedance Pro + fresh music). Extra-video credit packs have
+a $4.25 gross per-credit floor so they survive Stripe fees (credits TBD).
 """
 
 from datetime import datetime
@@ -30,7 +34,7 @@ TIERS = {
     "free":    {"label": "Free",    "videos_per_month": 1,    "max_channels": 1,    "loop_models": ["kling_v16"], "can_publish": False, "watermark": True},
     "starter": {"label": "Starter", "videos_per_month": 6,    "max_channels": 1,    "loop_models": _KLING,        "can_publish": True,  "watermark": False},
     "growth":  {"label": "Growth",  "videos_per_month": 15,   "max_channels": 3,    "loop_models": _MID,          "can_publish": True,  "watermark": False},
-    "pro":     {"label": "Pro",     "videos_per_month": 30,   "max_channels": None, "loop_models": _ALL,          "can_publish": True,  "watermark": False},
+    "pro":     {"label": "Pro",     "videos_per_month": 25,   "max_channels": None, "loop_models": _ALL,          "can_publish": True,  "watermark": False},
     "owner":   {"label": "Owner",   "videos_per_month": None, "max_channels": None, "loop_models": _ALL,          "can_publish": True,  "watermark": False},
 }
 DEFAULT_PLAN = "free"
