@@ -806,11 +806,12 @@ def index():
     month_prefix = f"{year:04d}-{month:02d}"
     month_projs = [p for p in all_proj if (p.get("scheduled_date") or "").startswith(month_prefix)]
     costs = [p.get("ledger_total") for p in all_proj if p.get("ledger_total")]
-    ap_cfg = profile.get("autopilot", {}) if isinstance(profile, dict) else {}
-    per_week = int(ap_cfg.get("videos_per_week", 3) or 3)
+    qs = tiers.quota_status(session.get("user", ""))
     usage = {
-        "count": len(month_projs),
-        "target": max(len(month_projs), per_week * 4),
+        "count": qs["used"],
+        "target": qs["limit"] if qs["limit"] is not None else max(qs["used"], 1),
+        "unlimited": qs["limit"] is None,
+        "plan_label": qs["label"],
         "avg_cost": round(sum(costs) / len(costs), 2) if costs else None,
         "published": stats["published"],
     }
@@ -1213,6 +1214,10 @@ def step2_slot_start(pid, slot):
     if tasks.is_running(pid):
         return jsonify(ok=False, error="Task already running")
     model = request.form.get("model", "kling_v16" if slot == "a" else "seedance_pro")
+    if not tiers.model_allowed(session.get("user", ""), model):
+        t = tiers.tier(session.get("user", ""))
+        return jsonify(ok=False, error=f"The {t['label']} plan doesn't include that "
+                       f"video model. Upgrade to use it, or pick an included one.")
     tasks.start_step2_slot(pid, slot, model)
     return jsonify(ok=True)
 
@@ -1466,6 +1471,9 @@ def step4_upload(pid):
         return jsonify(ok=False, error="Task already running")
     if not project["files"].get("final_video"):
         return jsonify(ok=False, error="Complete Step 3 first")
+    if not tiers.can_publish(session.get("user", "")):
+        return jsonify(ok=False, error="Your plan doesn't include publishing to "
+                       "YouTube. Upgrade to publish, or keep building drafts.")
     tasks.start_step4_upload(pid)
     return jsonify(ok=True)
 
@@ -1594,7 +1602,12 @@ def channel_autopilot_config(cid):
                 pass
     if "loop_model" in f and f.get("loop_model") in (
             "kling_v16", "kling_v21", "seedance_lite", "hailuo_pro", "seedance_pro"):
-        cfg["loop_model"] = f.get("loop_model")
+        want = f.get("loop_model")
+        if not tiers.model_allowed(session.get("user", ""), want):
+            t = tiers.tier(session.get("user", ""))
+            return jsonify(ok=False, error=f"The {t['label']} plan doesn't include "
+                           f"the {want} model. Upgrade to use it.")
+        cfg["loop_model"] = want
     chan["autopilot"] = cfg
     ch.save_channel(cid, chan)
     return jsonify(ok=True, autopilot=cfg)

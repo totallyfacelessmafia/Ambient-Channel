@@ -248,6 +248,12 @@ def _run_project_inner(pid: str) -> bool:
     project = state.get_project(pid)
     if not project.get("files", {}).get("loop"):
         model = cfg.get("loop_model", "kling_v16")
+        import tiers
+        owner = chan.get("owner", "")
+        if owner and not tiers.model_allowed(owner, model):
+            allowed = tiers.tier(owner)["loop_models"]
+            model = allowed[-1] if allowed else "kling_v16"
+            tasks._log(pid, f"AUTOPILOT: plan doesn't include the configured model — using {model}.")
         ok = False
         for attempt in (1, 2):
             if _stage(pid, "loop", tasks._run_step2_slot, (pid, "a", model), 2) == "ok":
@@ -313,6 +319,15 @@ def _run_project_inner(pid: str) -> bool:
         return False
 
     # ── Publish time: use the shell's slot, else the next sensible one ──
+    # Free/no-publish plans: build the video but stop before upload.
+    import tiers
+    owner = chan.get("owner", "")
+    if owner and not tiers.can_publish(owner):
+        tasks._log(pid, "AUTOPILOT: your plan doesn't allow publishing — the video "
+                        "is built and saved as a draft. Upgrade to publish it.")
+        state.update_project(pid, autopilot_state="done")
+        return True
+
     project = state.get_project(pid)
     pub_at = (project.get("youtube") or {}).get("scheduled_publish_at")
     if not pub_at:
