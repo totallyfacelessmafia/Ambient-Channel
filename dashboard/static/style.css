@@ -2996,3 +2996,18 @@ body:has(.app-frame) { overflow: hidden; }
   color: var(--amber); font-size: 13.5px; font-weight: 500;
   border-left: 3px solid var(--amber);
 }
+
+/* Plan & Billing page */
+.billing-page { max-width: 900px; }
+.bill-current { display: flex; align-items: center; gap: 24px; padding: 20px 24px; flex-wrap: wrap; }
+.bill-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+.bill-plan { font-size: 22px; font-weight: 700; margin-top: 2px; }
+.bill-usage { color: var(--muted); font-size: 14px; margin-left: auto; }
+.bill-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 16px; }
+.bill-card { padding: 20px 22px; display: flex; flex-direction: column; gap: 12px; }
+.bill-card-current { border-top-color: var(--accent); border-left: 2px solid var(--accent); }
+.bill-card-name { font-size: 17px; font-weight: 700; }
+.bill-feats { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 7px; flex: 1; }
+.bill-feats li { font-size: 13px; color: var(--text); padding-left: 18px; position: relative; }
+.bill-feats li::before { content: "✓"; position: absolute; left: 0; color: var(--accent2); font-size: 11px; }
+.bill-card .btn { margin-top: auto; }

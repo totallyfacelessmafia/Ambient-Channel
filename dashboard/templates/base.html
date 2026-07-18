@@ -52,6 +52,8 @@
            href="{{ url_for('image_library_page') }}"><span class="ico">▦</span> Image Library</a>
         <a class="side-item {% if request.endpoint == 'onboarding' %}active{% endif %}"
            href="{{ url_for('onboarding') }}"><span class="ico">✦</span> Channel Setup</a>
+        <a class="side-item {% if request.endpoint == 'billing_page' %}active{% endif %}"
+           href="{{ url_for('billing_page') }}"><span class="ico">◇</span> Plan &amp; Billing</a>
         <div class="side-spacer"></div>
         <div class="side-foot">Signed in as<br><b>{{ session.user }}</b></div>
       </nav>

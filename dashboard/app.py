@@ -19,6 +19,7 @@ from flask import (Flask, abort, g, jsonify, redirect, render_template,
 
 import auth
 import autopilot
+import billing
 import channel_profile
 import channels as ch
 import state
@@ -1965,6 +1966,54 @@ def delete_song(filename):
         return jsonify(ok=False, error="File not found"), 404
     path.unlink()
     return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------------------
+# Billing (Stripe) — scaffolding; inert until config.json has keys + price IDs
+# ---------------------------------------------------------------------------
+
+@app.route("/billing")
+@auth.login_required
+def billing_page():
+    user = session.get("user", "")
+    qs = tiers.quota_status(user)
+    return render_template(
+        "billing.html",
+        quota=qs,
+        tiers=tiers.TIERS,
+        configured=billing.is_configured(),
+        plans=billing.SUBSCRIPTION_PLANS,
+    )
+
+
+@app.route("/billing/checkout", methods=["POST"])
+@auth.login_required
+def billing_checkout():
+    plan = request.form.get("plan", "")
+    result = billing.create_checkout_session(
+        session.get("user", ""), plan, request.host_url)
+    if result.get("ok"):
+        return jsonify(ok=True, url=result["url"])
+    return jsonify(ok=False, error=result.get("error"))
+
+
+@app.route("/billing/portal", methods=["POST"])
+@auth.login_required
+def billing_portal():
+    result = billing.create_billing_portal(session.get("user", ""), request.host_url)
+    if result.get("ok"):
+        return jsonify(ok=True, url=result["url"])
+    return jsonify(ok=False, error=result.get("error"))
+
+
+@app.route("/billing/webhook", methods=["POST"])
+def billing_webhook():
+    """Stripe posts here. No login/CSRF — authenticity is the signature."""
+    result = billing.handle_webhook(
+        request.get_data(), request.headers.get("Stripe-Signature", ""))
+    if result.get("ok"):
+        return "", 200
+    return jsonify(error=result.get("error")), 400
 
 
 @app.route("/api/youtube-style")

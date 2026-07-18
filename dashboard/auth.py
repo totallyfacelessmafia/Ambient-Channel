@@ -220,6 +220,28 @@ def set_plan(email: str, plan: str) -> bool:
     return True
 
 
+def set_stripe_customer(email: str, customer_id: str) -> bool:
+    """Remember the Stripe customer id for an account, so later subscription
+    webhooks (which carry only the customer id) can map back to the user."""
+    data = _load()
+    rec = _user_record(data, email)
+    if rec is None:
+        return False
+    rec["stripe_customer_id"] = customer_id
+    data["users"][email] = rec
+    _save(data)
+    return True
+
+
+def email_by_stripe_customer(customer_id: str) -> str | None:
+    if not customer_id:
+        return None
+    for email, rec in _load().get("users", {}).items():
+        if rec.get("stripe_customer_id") == customer_id:
+            return email
+    return None
+
+
 def migrate_plans() -> None:
     """Stamp any user missing a plan as 'owner' (the pre-billing operator).
     New signups get an explicit plan via create_user, so only legacy/operator
