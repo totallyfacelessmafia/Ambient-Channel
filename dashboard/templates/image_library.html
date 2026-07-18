@@ -1,12 +1,9 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AmbiHub · Image Library</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=6">
-  <style>
-    .lib-main { padding: 28px 32px; max-width: 1300px; }
+{% extends "base.html" %}
+{% block title %}AmbiHub · Image Library{% endblock %}
+
+{% block content %}
+<style>
+    .lib-main { max-width: 1300px; }
 
     /* Generate bar */
     .lib-generate-bar {
@@ -139,32 +136,9 @@
       z-index: 2; color: rgba(255,255,255,.6); font-size: 13px;
       background: rgba(0,0,0,.4); padding: 4px 12px; border-radius: 20px;
     }
-  </style>
-</head>
-<body class="dashboard-body">
+</style>
 
-<header class="dash-header">
-  <a class="dash-brand" href="/"><span class="logo-bolt">&#9889;</span> Ambi<span class="logo-hub">Hub</span></a>
-  <div class="dash-header-right">
-    <span class="nav-user">{{ session.user }}</span>
-    <a class="btn btn-ghost btn-sm" href="{{ url_for('onboarding') }}">Channel Setup</a>
-    <form method="POST" action="{{ url_for('logout') }}" style="display:inline">
-      <button type="submit" class="btn btn-ghost btn-sm">Logout</button>
-    </form>
-  </div>
-</header>
-
-<div class="dash-layout" id="dash-layout">
-
-  <nav class="dash-nav">
-    <div class="dash-nav-links">
-      <a class="dash-nav-link" href="/">&#8862; Dashboard</a>
-      <a class="dash-nav-link active" href="{{ url_for('image_library_page') }}">&#128444; Image Library</a>
-      <a class="dash-nav-link" href="{{ url_for('onboarding') }}">&#9881; Channel Setup</a>
-    </div>
-  </nav>
-
-  <div class="dash-main lib-main" id="lib-main">
+<div class="lib-main" id="lib-main">
 
     <h2 style="margin-bottom:20px; font-size:20px;">Image Library</h2>
 
@@ -249,8 +223,7 @@
     </div>
     {% endif %}
 
-  </div><!-- dash-main -->
-</div><!-- dash-layout -->
+</div><!-- lib-main -->
 
 <!-- Lightbox -->
 <div id="lib-lightbox" style="display:none">
@@ -261,8 +234,9 @@
   <button class="lib-lb-btn" id="lib-lb-next">&#10095;</button>
   <div id="lib-lb-counter"></div>
 </div>
+{% endblock %}
 
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+{% block scripts %}
 <script>
 var _libPollTimer = null;
 var _knownBatchIds = new Set({{ batches | map(attribute='id') | list | tojson }});
@@ -564,5 +538,4 @@ document.getElementById('lib-gen-btn').disabled = true;
 libStartPolling();
 {% endif %}
 </script>
-</body>
-</html>
+{% endblock %}

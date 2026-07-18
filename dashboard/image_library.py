@@ -27,14 +27,31 @@ def _default() -> dict:
     return {"batches": [], "used_images": [], "generating": False, "generate_error": None}
 
 
+def _basename(p) -> str:
+    """Cross-platform basename: handles Windows paths (backslashes) even on
+    POSIX, so a library entry saved on the Windows box still resolves here."""
+    return os.path.basename(str(p).replace("\\", "/"))
+
+
+def _normalize_paths(data: dict) -> None:
+    """Reduce every stored image reference to a bare basename, in place.
+    Legacy batches saved full (often Windows) absolute paths, which don't
+    resolve through /files/ on another machine — this self-heals them."""
+    for batch in data.get("batches", []):
+        batch["images"] = [_basename(p) for p in batch.get("images", [])]
+    data["used_images"] = [_basename(p) for p in data.get("used_images", [])]
+
+
 def load(cid: str) -> dict:
     f = _file(cid)
     if not f.exists():
         return _default()
     try:
-        return json.loads(f.read_text(encoding="utf-8"))
+        data = json.loads(f.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return _default()
+    _normalize_paths(data)   # legacy full-path entries; persisted on the next save
+    return data
 
 
 def _save(cid: str, data: dict) -> None:
@@ -65,7 +82,7 @@ def add_batch(cid: str, prompt: str, image_paths: list) -> dict:
     entry = {
         "id": uuid4().hex[:8],
         "prompt": prompt,
-        "images": [str(p) for p in image_paths],
+        "images": [_basename(p) for p in image_paths],
         "created_at": datetime.now().isoformat(timespec="seconds"),
     }
     with _lock:
@@ -79,7 +96,7 @@ def add_batch(cid: str, prompt: str, image_paths: list) -> dict:
 
 def mark_image_used(cid: str, filename: str) -> None:
     """Move an image from the available pool into the used list."""
-    safe_name = Path(filename).name
+    safe_name = _basename(filename)
     with _lock:
         data = load(cid)
         if "used_images" not in data:
@@ -87,21 +104,21 @@ def mark_image_used(cid: str, filename: str) -> None:
         if safe_name not in data["used_images"]:
             data["used_images"].append(safe_name)
         for batch in data["batches"]:
-            batch["images"] = [p for p in batch["images"] if Path(p).name != safe_name]
+            batch["images"] = [p for p in batch["images"] if _basename(p) != safe_name]
         data["batches"] = [b for b in data["batches"] if b["images"]]
         _save(cid, data)
 
 
 def delete_image(cid: str, filename: str, output_dir: Path) -> None:
     """Remove an image from all batches (and used list) and delete the file."""
-    safe_name = Path(filename).name  # strip any path traversal
+    safe_name = _basename(filename)  # strip any path/traversal
     with _lock:
         data = load(cid)
         for batch in data["batches"]:
-            batch["images"] = [p for p in batch["images"] if Path(p).name != safe_name]
+            batch["images"] = [p for p in batch["images"] if _basename(p) != safe_name]
         data["batches"] = [b for b in data["batches"] if b["images"]]
         if "used_images" in data:
-            data["used_images"] = [p for p in data["used_images"] if Path(p).name != safe_name]
+            data["used_images"] = [p for p in data["used_images"] if _basename(p) != safe_name]
         _save(cid, data)
     target = output_dir / safe_name
     if target.exists() and target.is_file():

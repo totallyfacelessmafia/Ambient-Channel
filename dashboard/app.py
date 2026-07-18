@@ -1735,7 +1735,9 @@ def api_project(pid):
 @app.route("/files/<path:fp>")
 @auth.login_required
 def serve_file(fp):
-    filename = Path(fp).name
+    # Normalize backslashes too: a legacy library entry may carry a full
+    # Windows path, and Path(...).name on POSIX would not split it.
+    filename = os.path.basename(str(fp).replace("\\", "/"))
     user = session.get("user", "")
     # Project assets are named "<pid>_..." (pid = 8 hex chars). Verify the
     # requester owns the project that produced the file before serving it.
