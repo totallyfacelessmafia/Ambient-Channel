@@ -2937,3 +2937,27 @@ body:has(.app-frame) { overflow: hidden; }
 .publish-state b { font-weight: 600; }
 .manage-controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .manage-controls input[type="datetime-local"] { min-width: 220px; }
+
+/* Onboarding: prominent YouTube-connect step */
+.ob-connect {
+  display: flex; gap: 16px; align-items: flex-start;
+  padding: 22px 24px; margin-bottom: 20px;
+  background: var(--surface);
+  -webkit-backdrop-filter: blur(25px); backdrop-filter: blur(25px);
+  border: 1px solid var(--border);
+  border-top-color: rgba(255,255,255,.16);
+  border-left: 3px solid var(--accent);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,.37);
+}
+.ob-connect-done { border-left-color: #34d399; }
+.ob-connect-num {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 700; font-size: 14px;
+  background: linear-gradient(135deg, #3D6BFF, #5B8CFF); color: #fff;
+}
+.ob-connect-done .ob-connect-num { background: #34d399; color: #06231a; }
+.ob-connect-body h2 { font-size: 17px; font-weight: 700; margin: 2px 0 6px; }
+.ob-connect-body p { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 0 0 12px; max-width: 60ch; }
+.ob-connect-body .btn { margin-top: 2px; }
+.ob-connect-warn { color: var(--amber) !important; }

@@ -1,12 +1,39 @@
 {% extends "base.html" %}
-{% block title %}Channel Setup — UltraFocusZone{% endblock %}
+{% block title %}Channel Setup — AmbiHub{% endblock %}
 
 {% block content %}
 <div class="onboarding-page">
 
   <div class="onboarding-header">
-    <h1>Channel Setup</h1>
-    <p class="subtitle">Tell us about your channel so every video matches your style.</p>
+    <h1>Set up your channel</h1>
+    <p class="subtitle">Two quick things: connect YouTube, then tell us your style. Takes a minute.</p>
+  </div>
+
+  <!-- ── Step 1: Connect YouTube (the one connection that makes the product work) ── -->
+  <div class="ob-connect {% if yt_connected %}ob-connect-done{% endif %}">
+    <div class="ob-connect-num">1</div>
+    <div class="ob-connect-body">
+      {% if yt_connected %}
+      <h2>&#10003; YouTube connected</h2>
+      <p>Your channel is linked. AmbiHub can publish videos to it on your schedule.</p>
+      {% else %}
+      <h2>Connect your YouTube channel</h2>
+      <p>This is what lets AmbiHub upload finished videos to your channel. Without it,
+         Autopilot can't publish — so do this first. You'll approve access on Google, and
+         every upload stays private until the time you choose.</p>
+      {% if not yt_configured %}
+      <p class="ob-connect-warn">&#9888; YouTube API isn't configured on this server yet
+         (missing OAuth credentials). Connection will be available once that's set.</p>
+      {% else %}
+      <a class="btn btn-primary" href="{{ url_for('oauth_start') }}">Connect YouTube</a>
+      {% endif %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="onboarding-header" style="margin-top:8px">
+    <h2 style="font-size:18px">2 · Your channel style</h2>
+    <p class="subtitle">So every video matches your look and sound.</p>
   </div>
 
   <form method="POST" action="{{ url_for('onboarding_save') }}" id="onboarding-form">
@@ -17,7 +44,7 @@
         <span class="ob-step-num">1</span>
         <div>
           <h2>About Your Channel</h2>
-          <p>Connect your YouTube channel so we can learn your visual style.</p>
+          <p>Paste your channel URL and we'll learn your visual style from your existing thumbnails. (This is just a public lookup — it doesn't grant upload access; that's the Connect step above.)</p>
         </div>
       </div>
 
@@ -76,7 +103,7 @@
           <input type="text" id="music_style" name="music_style"
                  value="{{ profile.music_style }}"
                  placeholder="e.g. electronic, ambient, deep, slow, warm, instrumental">
-          <small>Suno prompt tags for the background music generated with each video.</small>
+          <small>Style tags for the background music generated with each video (via Stable Audio).</small>
         </div>
       </div>
     </div>

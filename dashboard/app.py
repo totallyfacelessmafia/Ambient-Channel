@@ -295,12 +295,16 @@ def onboarding():
         new_ch = ch.create_channel()
         session["channel_id"] = new_ch["id"]
         cid, profile = new_ch["id"], new_ch
+    import youtube_upload as yu
+    yt_status = yu.get_auth_status(cid or "")
     return render_template(
         "onboarding.html",
         profile=profile,
         cid=cid,
         vibe_options=ch.VIBE_OPTIONS,
         is_new_channel=not profile.get("completed"),
+        yt_connected=yt_status.get("connected", False),
+        yt_configured=yt_status.get("configured", False),
     )
 
 
