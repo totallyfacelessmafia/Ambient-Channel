@@ -143,6 +143,11 @@ def _fail(pid: str, msg: str) -> None:
         pid, status="error", autopilot_state="failed",
         task={"running": False, "step_running": None, "error": f"Autopilot: {msg}"},
     )
+    try:
+        import notifications
+        notifications.notify_failed(pid, msg)
+    except Exception:
+        pass
 
 
 def _ambient_fallback(pid: str) -> bool:
@@ -350,6 +355,12 @@ def _run_project_inner(pid: str) -> bool:
     q = (state.get_project(pid) or {}).get("quality") or {}
     warn_note = f" ({len(q.get('warnings', []))} quality warning(s))" if q.get("warnings") else ""
     tasks._log(pid, f"AUTOPILOT: complete{warn_note}. Video is scheduled.")
+    # Tell the owner to review it before it goes live (the veto window).
+    try:
+        import notifications
+        notifications.notify_scheduled(pid)
+    except Exception as _nexc:  # never let a notify failure fail the run
+        tasks._log(pid, f"(notification skipped: {_nexc})")
     return True
 
 
