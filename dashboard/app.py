@@ -23,6 +23,7 @@ import channel_profile
 import channels as ch
 import state
 import tasks
+import tiers
 
 import os
 
@@ -145,6 +146,7 @@ def _migrate_media():
 
 _migrate_ownership()
 _migrate_media()
+auth.migrate_plans()   # stamp the pre-billing operator account as 'owner'
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +236,9 @@ def channel_switch(cid):
 @app.route("/channels/new", methods=["POST"])
 @auth.login_required
 def channel_new():
+    allowed, why = tiers.can_add_channel(session.get("user", ""))
+    if not allowed:
+        return redirect(url_for("index", err=why))
     new_ch = ch.create_channel(owner=session.get("user", ""))
     session["channel_id"] = new_ch["id"]
     return redirect(url_for("onboarding"))
@@ -847,6 +852,9 @@ def autopilot_new():
                        error="Connect your YouTube channel before running Autopilot — "
                              "otherwise it would spend AI credits and then fail at upload.",
                        connect_url=url_for("oauth_start"))
+    allowed, why = tiers.can_create_video(session.get("user", ""))
+    if not allowed:
+        return jsonify(ok=False, error=why)
     project = state.create_project()
     channel_name = (channel or {}).get("channel_name", "")
     state.update_project(
@@ -966,6 +974,9 @@ def new_project_form():
     cid, channel = _require_channel()
     if not cid or not ch.is_complete(cid):
         return jsonify(ok=False, error="Complete channel setup first", redirect=url_for("onboarding"))
+    allowed, why = tiers.can_create_video(session.get("user", ""))
+    if not allowed:
+        return jsonify(ok=False, error=why)
     project = state.create_project()
     scheduled_date = request.form.get("scheduled_date", "").strip()
     prompt = request.form.get("prompt", "").strip()

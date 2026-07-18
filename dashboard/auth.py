@@ -112,6 +112,7 @@ def create_user(email: str, password: str) -> None:
         "verified":      False,
         "reset_token":   None,
         "reset_expires": None,
+        "plan":          "free",   # new signups start on the free trial tier
     }
     _save(data)
 
@@ -196,6 +197,42 @@ def mark_verified(email: str) -> None:
     if rec:
         rec["verified"] = True
         data["users"][email] = rec
+        _save(data)
+
+
+# ── Subscription plan (used by tiers.py for quota/capability enforcement) ─────
+
+def get_plan(email: str) -> str | None:
+    data = _load()
+    rec = _user_record(data, email)
+    return (rec or {}).get("plan")
+
+
+def set_plan(email: str, plan: str) -> bool:
+    """Set an account's plan (called by billing when a subscription changes)."""
+    data = _load()
+    rec = _user_record(data, email)
+    if rec is None:
+        return False
+    rec["plan"] = plan
+    data["users"][email] = rec
+    _save(data)
+    return True
+
+
+def migrate_plans() -> None:
+    """Stamp any user missing a plan as 'owner' (the pre-billing operator).
+    New signups get an explicit plan via create_user, so only legacy/operator
+    accounts — created before plans existed — hit this. Idempotent."""
+    data = _load()
+    changed = False
+    for email in list(data.get("users", {}).keys()):
+        rec = _user_record(data, email)
+        if rec is not None and not rec.get("plan"):
+            rec["plan"] = "owner"
+            data["users"][email] = rec
+            changed = True
+    if changed:
         _save(data)
 
 
