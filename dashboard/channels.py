@@ -33,6 +33,7 @@ VIBE_OPTIONS = [
 
 def _channel_default() -> dict:
     return {
+        "owner":              "",      # user email that owns this channel (multi-tenancy)
         "completed":          False,
         "channel_name":       "",
         "channel_url":        "",
@@ -90,11 +91,36 @@ def _save_raw(data: dict) -> None:
 # ---------------------------------------------------------------------------
 
 def all_channels() -> list:
-    """Return all channel dicts sorted by created_at ascending."""
+    """Return ALL channel dicts (every user) sorted by created_at. Use only for
+    server-wide jobs (e.g. the autopilot scheduler); user-facing code must use
+    channels_for_user()."""
     data = _load_raw()
     channels = list(data.get("channels", {}).values())
     channels.sort(key=lambda c: c.get("created_at", ""))
     return channels
+
+
+def channels_for_user(email: str) -> list:
+    """Channels owned by this user (the multi-tenant, user-facing list)."""
+    if not email:
+        return []
+    return [c for c in all_channels() if c.get("owner") == email]
+
+
+def user_owns_channel(cid: str, email: str) -> bool:
+    if not cid or not email:
+        return False
+    c = get_channel(cid)
+    return bool(c and c.get("owner") == email)
+
+
+def backfill_owner(cid: str, email: str) -> None:
+    """One-time migration helper: assign an ownerless channel to a user."""
+    data = _load_raw()
+    c = data.get("channels", {}).get(cid)
+    if c is not None and not c.get("owner"):
+        c["owner"] = email
+        _save_raw(data)
 
 
 def get_channel(cid: str) -> dict | None:
@@ -112,12 +138,13 @@ def get_channel(cid: str) -> dict | None:
     return ch
 
 
-def create_channel() -> dict:
+def create_channel(owner: str = "") -> dict:
     """Mint a new blank channel and persist it. Returns the new channel dict."""
     cid = "ch_" + uuid4().hex[:8]
     now = datetime.now().isoformat(timespec="seconds")
     ch = {"id": cid, "created_at": now}
     ch.update(_channel_default())
+    ch["owner"] = owner
     data = _load_raw()
     data.setdefault("channels", {})[cid] = ch
     _save_raw(data)

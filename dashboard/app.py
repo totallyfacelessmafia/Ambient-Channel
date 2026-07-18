@@ -91,25 +91,72 @@ state.recover_crashed_tasks()
 ch.migrate_from_singleton()   # idempotent; runs once to create channels.json
 
 
+def _migrate_ownership():
+    """One-time: assign any ownerless channel to the sole existing user.
+    Only runs when there is exactly one account (the pre-multi-tenant case);
+    with multiple users an ownerless channel can't be attributed safely, so it
+    is left ownerless (invisible), which is the safe default."""
+    emails = list(auth._load().get("users", {}).keys())
+    if len(emails) != 1:
+        return
+    owner = emails[0]
+    for c in ch.all_channels():
+        if not c.get("owner"):
+            ch.backfill_owner(c["id"], owner)
+
+
+_migrate_ownership()
+
+
 # ---------------------------------------------------------------------------
 # Channel helpers
 # ---------------------------------------------------------------------------
 
 def _require_channel():
-    """Return (cid, channel_dict) for the session's active channel, or (None, None)."""
+    """Return (cid, channel_dict) for the session's active channel, or (None, None).
+    Only returns a channel the current user owns — otherwise clears it."""
     cid = session.get("channel_id")
+    user = session.get("user", "")
     channel = ch.get_channel(cid) if cid else None
+    if channel is not None and channel.get("owner") != user:
+        # Session points at someone else's / an ownerless channel — drop it.
+        session.pop("channel_id", None)
+        return None, None
     return cid, channel
+
+
+@app.before_request
+def enforce_ownership():
+    """Multi-tenancy guard: a user may only touch resources they own. Runs
+    after routing, so request.view_args carries any <pid>/<cid>."""
+    user = session.get("user")
+    if not user:
+        return
+    args = request.view_args or {}
+    pid = args.get("pid")
+    if pid:
+        proj = state.get_project(pid)
+        # A project is owned by whoever owns its channel.
+        if proj is not None and not ch.user_owns_channel(proj.get("channel_id", ""), user):
+            abort(403)
+    cid_arg = args.get("cid")
+    if cid_arg and ch.get_channel(cid_arg) is not None \
+            and not ch.user_owns_channel(cid_arg, user):
+        abort(403)
 
 
 @app.before_request
 def inject_channel_context():
     """Inject g.active_channel, g.active_cid, g.all_channels into every request."""
-    if not session.get("user"):
+    user = session.get("user")
+    if not user:
         return
-    all_chs = ch.all_channels()
+    all_chs = ch.channels_for_user(user)     # only this user's channels
     cid = session.get("channel_id")
-    # Auto-select the only channel when there is exactly one (common case)
+    # Drop a stale/foreign active channel; auto-select the sole owned one.
+    if cid and not any(c["id"] == cid for c in all_chs):
+        session.pop("channel_id", None)
+        cid = None
     if not cid and len(all_chs) == 1:
         cid = all_chs[0]["id"]
         session["channel_id"] = cid
@@ -132,7 +179,7 @@ def inject_channel_context():
 @app.route("/channels/switch/<cid>", methods=["POST"])
 @auth.login_required
 def channel_switch(cid):
-    if ch.get_channel(cid) is None:
+    if not ch.user_owns_channel(cid, session.get("user", "")):
         return jsonify(ok=False, error="Unknown channel"), 404
     session["channel_id"] = cid
     return jsonify(ok=True)
@@ -141,7 +188,7 @@ def channel_switch(cid):
 @app.route("/channels/new", methods=["POST"])
 @auth.login_required
 def channel_new():
-    new_ch = ch.create_channel()
+    new_ch = ch.create_channel(owner=session.get("user", ""))
     session["channel_id"] = new_ch["id"]
     return redirect(url_for("onboarding"))
 
@@ -151,7 +198,7 @@ def channel_new():
 def api_channels():
     return jsonify(channels=[
         {"id": c["id"], "channel_name": c.get("channel_name", ""), "completed": c.get("completed", False)}
-        for c in ch.all_channels()
+        for c in ch.channels_for_user(session.get("user", ""))
     ])
 
 
@@ -171,8 +218,9 @@ def login_page():
 
         if auth.verify_password(email, password):
             session["user"] = email
+            session.pop("channel_id", None)   # never inherit a prior user's channel
             # Auto-select single channel; redirect to onboarding if none complete
-            all_chs = ch.all_channels()
+            all_chs = ch.channels_for_user(email)
             if not all_chs:
                 return redirect(url_for("onboarding"))
             if len(all_chs) == 1:
@@ -208,7 +256,7 @@ def register_page():
                 auth.create_user(email, password)
                 session["user"] = email
                 # Auto-create their first channel and go to onboarding
-                new_ch = ch.create_channel()
+                new_ch = ch.create_channel(owner=email)
                 session["channel_id"] = new_ch["id"]
                 return redirect(url_for("onboarding"))
             except ValueError as e:
@@ -292,7 +340,7 @@ def onboarding():
     cid, profile = _require_channel()
     if not cid:
         # No channel yet — create a blank one to onboard into
-        new_ch = ch.create_channel()
+        new_ch = ch.create_channel(owner=session.get("user", ""))
         session["channel_id"] = new_ch["id"]
         cid, profile = new_ch["id"], new_ch
     import youtube_upload as yu
@@ -835,7 +883,7 @@ def api_calendar():
         year, month = today.year, today.month
 
     cid = session.get("channel_id", "")
-    all_proj  = state.projects_for_channel(cid) if cid else state.all_projects()
+    all_proj  = state.projects_for_channel(cid) if cid else []
     scheduled = {}
     for p in all_proj:
         d = p.get("scheduled_date")
@@ -1529,7 +1577,7 @@ def api_batch_schedule():
 
     # Already-occupied dates for this channel (skip rather than double-book)
     cid = session.get("channel_id", "")
-    channel_projects = state.projects_for_channel(cid) if cid else state.all_projects()
+    channel_projects = state.projects_for_channel(cid) if cid else []
     occupied = {p.get("scheduled_date") for p in channel_projects if p.get("scheduled_date")}
 
     # Get channel name for stamping on new projects
