@@ -43,6 +43,8 @@
       <nav class="app-side" aria-label="Main">
         <a class="side-item {% if request.endpoint == 'index' %}active{% endif %}"
            href="{{ url_for('index') }}"><span class="ico">⌂</span> Home</a>
+        <a class="side-item {% if request.endpoint == 'my_videos' %}active{% endif %}"
+           href="{{ url_for('my_videos') }}"><span class="ico">▸</span> My Videos</a>
         <a class="side-item {% if request.endpoint == 'research_page' %}active{% endif %}"
            href="{{ url_for('research_page') }}"><span class="ico">◎</span> Research
           {% if g.research_unseen > 0 %}<span class="nav-badge">{{ g.research_unseen }}</span>{% endif %}</a>

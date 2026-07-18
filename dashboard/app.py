@@ -766,6 +766,61 @@ def autopilot_new():
     return jsonify(ok=True, pid=project["id"])
 
 
+def _video_state(p: dict) -> dict:
+    """One unified state descriptor for a project, for the My Videos list."""
+    yt = p.get("youtube", {})
+    from datetime import datetime as _dt, timezone as _tz
+    if yt.get("upload_status") == "done":
+        pub = yt.get("scheduled_publish_at")
+        if pub:
+            future = True
+            try:
+                future = _dt.fromisoformat(pub.replace("Z", "+00:00")) > _dt.now(_tz.utc)
+            except ValueError:
+                pass
+            return {"key": "scheduled", "label": "Scheduled", "sort": 2} if future \
+                else {"key": "live", "label": "Live", "sort": 1}
+        if yt.get("privacy") == "public":
+            return {"key": "live", "label": "Live", "sort": 1}
+        return {"key": "private", "label": "Private draft", "sort": 3}
+    if p.get("status") == "running":
+        return {"key": "working", "label": "Working…", "sort": 0}
+    if p.get("status") == "error":
+        return {"key": "error", "label": "Needs attention", "sort": 0}
+    return {"key": "draft", "label": f"Draft · step {p.get('step', 1)} of 4", "sort": 4}
+
+
+@app.route("/videos")
+@auth.login_required
+def my_videos():
+    """One place to see every video and its state."""
+    cid, _ = _require_channel()
+    if not cid or not ch.is_complete(cid):
+        return redirect(url_for("onboarding"))
+    rows = []
+    for p in state.projects_for_channel(cid):
+        st = _video_state(p)
+        yt = p.get("youtube", {})
+        rows.append({
+            "id": p["id"],
+            "title": p.get("title") or "Untitled",
+            "thumbnail": (Path(p["files"].get("thumbnail")).name if p["files"].get("thumbnail")
+                          else (Path(p["files"].get("raw_image")).name if p["files"].get("raw_image") else None)),
+            "state": st,
+            "scheduled_date": p.get("scheduled_date"),
+            "publish_at": yt.get("scheduled_publish_at"),
+            "video_id": yt.get("video_id"),
+            "cost": p.get("ledger_total"),
+            "updated_at": p.get("updated_at", ""),
+        })
+    # Working/error first, then live, scheduled, private, drafts; newest within each.
+    # Two stable passes: newest-first, then group — the group sort preserves
+    # the newest-first order inside each group.
+    rows.sort(key=lambda r: r["updated_at"], reverse=True)
+    rows.sort(key=lambda r: r["state"]["sort"])
+    return render_template("my_videos.html", rows=rows)
+
+
 @app.route("/api/calendar")
 @auth.login_required
 def api_calendar():

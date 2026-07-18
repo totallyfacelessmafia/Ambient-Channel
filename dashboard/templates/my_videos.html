@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}My Videos — AmbiHub{% endblock %}
+
+{% block content %}
+<div class="mv-page">
+  <div class="mv-head">
+    <h1>My Videos</h1>
+    <span class="mv-count">{{ rows|length }} total</span>
+  </div>
+
+  {% if rows %}
+  <div class="mv-list">
+    {% for r in rows %}
+    <a class="mv-row glass" href="/project/{{ r.id }}">
+      <div class="mv-thumb"{% if r.thumbnail %} style="background-image:url('/files/{{ r.thumbnail }}')"{% endif %}></div>
+      <div class="mv-main">
+        <div class="mv-title">{{ r.title }}</div>
+        <div class="mv-meta">
+          {% if r.state.key == 'scheduled' and r.publish_at %}
+          Goes live <span class="js-utc-local" data-utc="{{ r.publish_at }}">{{ r.publish_at[:10] }}</span>
+          {% elif r.state.key == 'live' and r.video_id %}
+          <a href="https://youtu.be/{{ r.video_id }}" target="_blank" onclick="event.stopPropagation()">youtu.be/{{ r.video_id }}</a>
+          {% elif r.scheduled_date %}
+          {{ r.scheduled_date }}
+          {% endif %}
+          {% if r.cost %}<span class="mv-cost">· ${{ r.cost }}</span>{% endif %}
+        </div>
+      </div>
+      <span class="mv-pill mv-{{ r.state.key }}">{{ r.state.label }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="mv-empty glass">
+    <p>No videos yet.</p>
+    <p class="hint">Click <b>+ New Video</b> up top, or run Autopilot from Home.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  document.querySelectorAll('.js-utc-local').forEach(function(s){
+    if (s.dataset.utc) s.textContent = new Date(s.dataset.utc).toLocaleDateString([], {month:'short', day:'numeric'});
+  });
+</script>
+{% endblock %}
