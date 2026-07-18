@@ -75,6 +75,15 @@ def _log(pid: str, msg: str) -> None:
     state.append_log(pid, f"[{ts}] {msg}")
 
 
+def _music_dir(pid: str) -> Path:
+    """This project's channel music library (music/<cid>/). Songs are private
+    to the channel that created them — the copyright/tenancy boundary."""
+    import channels as ch
+    p = state.get_project(pid) or {}
+    cid = p.get("channel_id", "")
+    return ch.music_dir(cid) if cid else MUSIC_DIR
+
+
 def _record_quality(pid: str, key: str, ok: bool, warning: str | None = None) -> None:
     """
     Merge one quality flag into project state, keeping warnings from other
@@ -153,10 +162,10 @@ def _run_step1(pid: str) -> None:
         except Exception:
             pass
 
-        # Save all candidates to the Image Library so nothing is wasted
+        # Save all candidates to this channel's Image Library so nothing is wasted
         try:
             import image_library as il
-            il.add_batch(prompt, paths)
+            il.add_batch(cid, prompt, paths)
         except Exception as _ile:
             _log(pid, f"(Image Library save skipped: {_ile})")
 
@@ -525,6 +534,7 @@ def _run_step2b(pid: str, suno_prompt: str) -> None:
         _log(pid, "This takes 10–30 minutes depending on track count.")
         state.set_progress(pid, 5)
 
+        MUSIC_DIR = _music_dir(pid)
         MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 
         sa = SunoAutomation(headless=False, download_dir=str(MUSIC_DIR))
@@ -575,6 +585,7 @@ def _run_step2b_beatoven(pid: str, prompt: str, count: int) -> None:
     try:
         _log(pid, f"Beatoven: generating {count} tracks (30s each)...")
         _log(pid, f"Style: {prompt}")
+        MUSIC_DIR = _music_dir(pid)
         MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 
         saved = 0
@@ -651,6 +662,7 @@ def _run_step2b_stable_audio(pid: str, prompt: str, count: int) -> None:
     try:
         _log(pid, f"Stable Audio: generating {count} tracks (~3 min each)...")
         _log(pid, f"Style: {prompt}")
+        MUSIC_DIR = _music_dir(pid)
         MUSIC_DIR.mkdir(parents=True, exist_ok=True)
 
         saved = 0
@@ -809,6 +821,7 @@ def _run_step3(pid: str) -> None:
 
         # Skip macOS AppleDouble sidecars ("._x.mp3") — invisible in Finder/ls
         # on external volumes but returned by glob, and not real audio.
+        MUSIC_DIR = _music_dir(pid)   # this channel's private music library
         mp3_files = [p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._")]
         random.shuffle(mp3_files)
         if song_count > 0:
@@ -1102,12 +1115,11 @@ def start_step4_upload(pid: str) -> bool:
 # Image Library — standalone image generation (not tied to a project)
 # ---------------------------------------------------------------------------
 
-def _run_library_generate(prompt: str, count: int) -> None:
+def _run_library_generate(cid: str, prompt: str, count: int) -> None:
     import time as _time
     import image_library as il
     try:
         import generate_assets as ga
-        import channel_profile as cp
         import channels as ch
 
         if not prompt:
@@ -1119,24 +1131,21 @@ def _run_library_generate(prompt: str, count: int) -> None:
                 prompt = ""
 
         if not prompt:
-            # Image library generation is global (not per-channel), use first channel's prefix
-            all_chs = ch.all_channels()
-            prefix = ch.build_prompt_prefix(all_chs[0]["id"]) if all_chs else cp.build_prompt_prefix()
+            prefix = ch.build_prompt_prefix(cid) if cid else ""
             prompt = (prefix + ", " if prefix else "") + \
                      "warm ambient lighting, cinematic architectural photography, ultra realistic"
 
         slug = f"lib_{int(_time.time())}"
         paths = ga.generate_ai_images(prompt, OUTPUT_DIR, slug, count=count)
-        il.add_batch(prompt, paths)
+        il.add_batch(cid, prompt, paths)
 
     except Exception as exc:
-        import image_library as il
-        il.set_generating(False, error=str(exc))
+        il.set_generating(cid, False, error=str(exc))
 
 
-def start_library_generate(prompt: str, count: int = 4) -> None:
-    """Generate images for the image library in a background thread."""
-    t = threading.Thread(target=_run_library_generate, args=(prompt, count), daemon=True)
+def start_library_generate(cid: str, prompt: str, count: int = 4) -> None:
+    """Generate images for this channel's image library in a background thread."""
+    t = threading.Thread(target=_run_library_generate, args=(cid, prompt, count), daemon=True)
     t.start()
 
 

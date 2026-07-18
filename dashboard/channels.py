@@ -210,6 +210,24 @@ def logos_dir(cid: str) -> Path:
     return Path(__file__).parent / "logos" / cid
 
 
+# Per-channel media libraries (multi-tenancy: a channel's music/images are its
+# own — never shared across tenants). Music lives in the repo-root music/<cid>/.
+_ROOT = Path(__file__).parent.parent
+
+
+def music_dir(cid: str) -> Path:
+    """Per-channel music library. Songs generated for a channel stay private
+    to it — this is the copyright/tenancy boundary for audio."""
+    d = _ROOT / "music" / cid
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def image_library_file(cid: str) -> Path:
+    """Per-channel image-library metadata file."""
+    return Path(__file__).parent / f"image_library_{cid}.json"
+
+
 def save_logo(cid: str, file_storage) -> str:
     """Save an uploaded PNG/GIF logo and return the filename."""
     from werkzeug.utils import secure_filename

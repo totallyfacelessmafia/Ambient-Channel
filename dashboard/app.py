@@ -105,7 +105,46 @@ def _migrate_ownership():
             ch.backfill_owner(c["id"], owner)
 
 
+def _migrate_media():
+    """One-time: move the legacy GLOBAL music library + image-library file into
+    the sole channel's private, per-tenant location. Only runs with exactly one
+    user AND one channel (unambiguous); idempotent (skips if already moved)."""
+    import shutil as _sh
+    emails = list(auth._load().get("users", {}).keys())
+    if len(emails) != 1:
+        return
+    chans = ch.channels_for_user(emails[0])
+    if len(chans) != 1:
+        return
+    cid = chans[0]["id"]
+
+    # Root-level music/*.mp3 → music/<cid>/
+    dest = ch.music_dir(cid)
+    moved = 0
+    for f in MUSIC_DIR.glob("*.mp3"):
+        target = dest / f.name
+        if not target.exists():
+            _sh.move(str(f), str(target))
+            moved += 1
+    for junk in MUSIC_DIR.glob("._*"):          # macOS AppleDouble sidecars
+        if junk.is_file():
+            try:
+                junk.unlink()
+            except OSError:
+                pass
+    if moved:
+        print(f"[migrate] moved {moved} songs into music/{cid}/")
+
+    # Legacy global image_library.json → image_library_<cid>.json
+    legacy_lib = Path(__file__).parent / "image_library.json"
+    per_channel_lib = ch.image_library_file(cid)
+    if legacy_lib.exists() and not per_channel_lib.exists():
+        _sh.move(str(legacy_lib), str(per_channel_lib))
+        print(f"[migrate] image library → {per_channel_lib.name}")
+
+
 _migrate_ownership()
+_migrate_media()
 
 
 # ---------------------------------------------------------------------------
@@ -125,24 +164,31 @@ def _require_channel():
     return cid, channel
 
 
+def _looks_like_pid(v: str) -> bool:
+    return len(v) == 8 and all(c in "0123456789abcdef" for c in v)
+
+
 @app.before_request
 def enforce_ownership():
-    """Multi-tenancy guard: a user may only touch resources they own. Runs
-    after routing, so request.view_args carries any <pid>/<cid>."""
+    """Multi-tenancy guard: a user may only touch resources they own.
+
+    Name-INDEPENDENT: it inspects the ID *values* in the URL (any project id
+    or ch_ channel id, whatever the route names the param), so a future route
+    like /project/<id> can't silently escape the guard. Aborts 403 only when
+    the referenced resource exists and the user doesn't own it."""
     user = session.get("user")
     if not user:
         return
-    args = request.view_args or {}
-    pid = args.get("pid")
-    if pid:
-        proj = state.get_project(pid)
-        # A project is owned by whoever owns its channel.
-        if proj is not None and not ch.user_owns_channel(proj.get("channel_id", ""), user):
-            abort(403)
-    cid_arg = args.get("cid")
-    if cid_arg and ch.get_channel(cid_arg) is not None \
-            and not ch.user_owns_channel(cid_arg, user):
-        abort(403)
+    for val in (request.view_args or {}).values():
+        if not isinstance(val, str):
+            continue
+        if _looks_like_pid(val):
+            proj = state.get_project(val)
+            if proj is not None and not ch.user_owns_channel(proj.get("channel_id", ""), user):
+                abort(403)
+        elif val.startswith("ch_"):
+            if ch.get_channel(val) is not None and not ch.user_owns_channel(val, user):
+                abort(403)
 
 
 @app.before_request
@@ -952,7 +998,8 @@ def project_detail(pid):
     project = state.get_project(pid)
     if project is None:
         abort(404)
-    song_total = len([p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._")])
+    mdir = ch.music_dir(project.get("channel_id", "")) if project.get("channel_id") else MUSIC_DIR
+    song_total = len([p for p in mdir.glob("*.mp3") if not p.name.startswith("._")])
     return render_template("project.html", project=project, song_total=song_total)
 
 
@@ -1689,11 +1736,26 @@ def api_project(pid):
 @auth.login_required
 def serve_file(fp):
     filename = Path(fp).name
+    user = session.get("user", "")
+    # Project assets are named "<pid>_..." (pid = 8 hex chars). Verify the
+    # requester owns the project that produced the file before serving it.
+    prefix = filename[:8]
+    if len(filename) > 8 and filename[8] == "_" \
+            and all(c in "0123456789abcdef" for c in prefix):
+        proj = state.get_project(prefix)
+        if proj is not None and not ch.user_owns_channel(proj.get("channel_id", ""), user):
+            abort(403)
     for asset_dir in ASSET_DIRS:
         candidate = asset_dir / filename
         if candidate.exists() and candidate.is_file():
             mime, _ = mimetypes.guess_type(str(candidate))
             return send_file(str(candidate), mimetype=mime)
+    # Music: only from the active channel's own library (never cross-channel).
+    cid = g.get("active_cid", "")
+    if cid:
+        cand = ch.music_dir(cid) / filename
+        if cand.exists() and cand.is_file():
+            return send_file(str(cand), mimetype="audio/mpeg", conditional=True)
     abort(404)
 
 
@@ -1705,11 +1767,25 @@ def serve_file(fp):
 # Image Library
 # ---------------------------------------------------------------------------
 
+def _library_has_image(cid: str, safe_name: str) -> bool:
+    """True if this channel's library contains the image (blocks acting on
+    another tenant's image by basename)."""
+    import image_library as il
+    data = il.load(cid)
+    for b in data.get("batches", []):
+        if any(Path(p).name == safe_name for p in b["images"]):
+            return True
+    return safe_name in data.get("used_images", [])
+
+
 @app.route("/images")
 @auth.login_required
 def image_library_page():
     import image_library as il
-    data = il.load()
+    cid, _ = _require_channel()
+    if not cid:
+        return redirect(url_for("onboarding"))
+    data = il.load(cid)
     used_set = set(data.get("used_images", []))
     batches_out = []
     for b in data["batches"]:
@@ -1734,7 +1810,10 @@ def image_library_page():
 @auth.login_required
 def images_generate():
     import image_library as il
-    data = il.load()
+    cid, _ = _require_channel()
+    if not cid:
+        return jsonify(ok=False, error="Complete channel setup first.")
+    data = il.load(cid)
     if data["generating"]:
         return jsonify(ok=False, error="Already generating images.")
     prompt = request.form.get("prompt", "").strip()
@@ -1742,8 +1821,8 @@ def images_generate():
         count = max(1, min(4, int(request.form.get("count", 4))))
     except ValueError:
         count = 4
-    il.set_generating(True)
-    tasks.start_library_generate(prompt, count)
+    il.set_generating(cid, True)
+    tasks.start_library_generate(cid, prompt, count)
     return jsonify(ok=True)
 
 
@@ -1751,7 +1830,8 @@ def images_generate():
 @auth.login_required
 def api_images_status():
     import image_library as il
-    data = il.load()
+    cid, _ = _require_channel()
+    data = il.load(cid) if cid else il._default()
     batches_out = []
     for b in data["batches"]:
         batches_out.append({
@@ -1771,25 +1851,28 @@ def api_images_status():
 @app.route("/images/start-project", methods=["POST"])
 @auth.login_required
 def images_start_project():
+    import image_library as il
     filename = request.form.get("filename", "").strip()
     if not filename:
         return jsonify(ok=False, error="No image specified.")
     safe_name = Path(filename).name
+    cid, channel = _require_channel()
+    if not cid:
+        return jsonify(ok=False, error="Complete channel setup first.")
+    # Only act on an image that belongs to THIS channel's library.
+    if not _library_has_image(cid, safe_name):
+        return jsonify(ok=False, error="Image not found."), 404
     target = tasks.OUTPUT_DIR / safe_name
     if not target.exists() or not target.is_file():
-        return jsonify(ok=False, error="Image not found.")
+        return jsonify(ok=False, error="Image not found."), 404
     project = state.create_project()
-    # Stamp channel_id and channel_name on the new project
-    cid, channel = _require_channel()
-    if cid:
-        channel_name = (channel or {}).get("channel_name", "Ultra Focus Zone")
-        state.update_project(project["id"],
-            channel_id=cid,
-            song_config={"channel_name": channel_name},
-        )
+    channel_name = (channel or {}).get("channel_name", "Ultra Focus Zone")
+    state.update_project(project["id"],
+        channel_id=cid,
+        song_config={"channel_name": channel_name},
+    )
     tasks.start_step1_select(project["id"], str(target))
-    import image_library as il
-    il.mark_image_used(safe_name)
+    il.mark_image_used(cid, safe_name)
     return jsonify(
         ok=True,
         pid=project["id"],
@@ -1801,33 +1884,47 @@ def images_start_project():
 @auth.login_required
 def images_delete():
     import image_library as il
+    cid, _ = _require_channel()
     filename = request.form.get("filename", "").strip()
-    if not filename:
+    if not cid or not filename:
         return jsonify(ok=False, error="No filename.")
-    il.delete_image(filename, tasks.OUTPUT_DIR)
+    # Only delete an image that belongs to THIS channel's library.
+    if not _library_has_image(cid, Path(filename).name):
+        return jsonify(ok=False, error="Image not found."), 404
+    il.delete_image(cid, filename, tasks.OUTPUT_DIR)
     return jsonify(ok=True)
 
 
 # ---------------------------------------------------------------------------
+def _active_music_dir():
+    """The active channel's private music library, or None if no channel."""
+    cid = g.get("active_cid", "")
+    return ch.music_dir(cid) if cid else None
+
+
 @app.route("/api/songs")
 @auth.login_required
 def list_songs():
-    files = sorted(p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._"))
+    mdir = _active_music_dir()
+    files = sorted(p for p in mdir.glob("*.mp3") if not p.name.startswith("._")) if mdir else []
     return jsonify(total=len(files), files=[f.name for f in files])
 
 
 @app.route("/api/songs/count")
 @auth.login_required
 def songs_count():
-    return jsonify(total=len([p for p in MUSIC_DIR.glob("*.mp3") if not p.name.startswith("._")]))
+    mdir = _active_music_dir()
+    n = len([p for p in mdir.glob("*.mp3") if not p.name.startswith("._")]) if mdir else 0
+    return jsonify(total=n)
 
 
 @app.route("/api/songs/<filename>")
 @auth.login_required
 def serve_song(filename):
-    """Stream an MP3 from the music folder."""
-    path = MUSIC_DIR / filename
-    if not path.exists() or path.suffix.lower() != ".mp3":
+    """Stream an MP3 from the active channel's own music library."""
+    mdir = _active_music_dir()
+    path = (mdir / Path(filename).name) if mdir else None
+    if path is None or not path.exists() or path.suffix.lower() != ".mp3":
         abort(404)
     return send_file(path, mimetype="audio/mpeg", conditional=True)
 
@@ -1835,9 +1932,10 @@ def serve_song(filename):
 @app.route("/api/songs/<filename>/delete", methods=["POST"])
 @auth.login_required
 def delete_song(filename):
-    """Delete an MP3 from the music folder."""
-    path = MUSIC_DIR / filename
-    if not path.exists() or path.suffix.lower() != ".mp3":
+    """Delete an MP3 from the active channel's own music library."""
+    mdir = _active_music_dir()
+    path = (mdir / Path(filename).name) if mdir else None
+    if path is None or not path.exists() or path.suffix.lower() != ".mp3":
         return jsonify(ok=False, error="File not found"), 404
     path.unlink()
     return jsonify(ok=True)

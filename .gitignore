@@ -6,6 +6,7 @@ dashboard/channels.json
 dashboard/channel_profile.json
 dashboard/research_cache.json
 dashboard/image_library.json
+dashboard/image_library_*.json
 dashboard/yt_token*.json
 dashboard/logos/
 dashboard/style_refs/
