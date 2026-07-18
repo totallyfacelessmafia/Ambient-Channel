@@ -19,6 +19,9 @@ from flask import (Flask, abort, g, jsonify, redirect, render_template,
 
 import auth
 import autopilot
+import envload
+envload.load_env()   # .env / .env.local → os.environ (before config readers run)
+
 import billing
 import channel_profile
 import channels as ch

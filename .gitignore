@@ -62,3 +62,7 @@ desktop.ini
 
 # ── Claude ──
 .claude/
+
+# ── Env files (secrets) ──
+.env
+.env.local

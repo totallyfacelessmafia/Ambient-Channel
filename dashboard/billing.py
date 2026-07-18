@@ -32,10 +32,23 @@ SUBSCRIPTION_PLANS = ("starter", "growth", "pro")
 
 
 def _config() -> dict:
+    """Stripe config, env vars first (STRIPE_*), config.json stripe.* as fallback."""
+    import os
     try:
-        return json.loads(_CONFIG_FILE.read_text(encoding="utf-8")).get("stripe", {})
+        j = json.loads(_CONFIG_FILE.read_text(encoding="utf-8")).get("stripe", {})
     except (OSError, json.JSONDecodeError):
-        return {}
+        j = {}
+    jp = j.get("prices", {}) or {}
+    return {
+        "secret_key":      os.environ.get("STRIPE_SECRET_KEY") or j.get("secret_key", ""),
+        "webhook_secret":  os.environ.get("STRIPE_WEBHOOK_SECRET") or j.get("webhook_secret", ""),
+        "publishable_key": os.environ.get("STRIPE_PUBLISHABLE_KEY") or j.get("publishable_key", ""),
+        "prices": {
+            "starter": os.environ.get("STRIPE_PRICE_STARTER") or jp.get("starter", ""),
+            "growth":  os.environ.get("STRIPE_PRICE_GROWTH")  or jp.get("growth", ""),
+            "pro":     os.environ.get("STRIPE_PRICE_PRO")     or jp.get("pro", ""),
+        },
+    }
 
 
 def _prices() -> dict:

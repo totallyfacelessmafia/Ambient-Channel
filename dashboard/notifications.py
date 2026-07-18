@@ -30,10 +30,20 @@ _CONFIG_FILE = Path(__file__).parent.parent / "UltraFocusZone_Automation" / "con
 
 
 def _config() -> dict:
+    """Email config, env vars first (SMTP_* / EMAIL_FROM), config.json email.* fallback."""
+    import os
     try:
-        return json.loads(_CONFIG_FILE.read_text(encoding="utf-8")).get("email", {})
+        j = json.loads(_CONFIG_FILE.read_text(encoding="utf-8")).get("email", {})
     except (OSError, json.JSONDecodeError):
-        return {}
+        j = {}
+    return {
+        "smtp_host": os.environ.get("SMTP_HOST") or j.get("smtp_host", ""),
+        "smtp_port": os.environ.get("SMTP_PORT") or j.get("smtp_port", 587),
+        "smtp_user": os.environ.get("SMTP_USER") or j.get("smtp_user", ""),
+        "smtp_pass": os.environ.get("SMTP_PASS") or j.get("smtp_pass", ""),
+        "from":      os.environ.get("EMAIL_FROM") or j.get("from", ""),
+        "base_url":  os.environ.get("APP_BASE_URL") or j.get("base_url", ""),
+    }
 
 
 def is_configured() -> bool:

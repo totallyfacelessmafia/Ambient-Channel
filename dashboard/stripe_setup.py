@@ -41,14 +41,22 @@ SPECS = [
 
 
 def _secret_key() -> str:
+    import os
     try:
-        cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8")).get("stripe", {})
-    except (OSError, json.JSONDecodeError):
-        cfg = {}
-    key = cfg.get("secret_key", "")
+        import envload
+        envload.load_env()          # pick up .env / .env.local
+    except Exception:
+        pass
+    key = os.environ.get("STRIPE_SECRET_KEY", "")
     if not key.startswith("sk_"):
-        sys.exit("No Stripe secret key in config.json → stripe.secret_key "
-                 "(expected sk_test_… or sk_live_…).")
+        try:
+            key = json.loads(CONFIG_FILE.read_text(encoding="utf-8")) \
+                .get("stripe", {}).get("secret_key", "")
+        except (OSError, json.JSONDecodeError):
+            key = ""
+    if not key.startswith("sk_"):
+        sys.exit("No Stripe secret key found. Put STRIPE_SECRET_KEY in .env.local "
+                 "(or stripe.secret_key in config.json). Expected sk_test_… / sk_live_….")
     return key
 
 
@@ -109,17 +117,26 @@ def main():
         print()
 
     if args.apply and prices:
-        print("Price IDs:")
-        for plan, pid in prices.items():
-            print(f'   "{plan}": "{pid}"')
+        import re
+        env_names = {"starter": "STRIPE_PRICE_STARTER",
+                     "growth": "STRIPE_PRICE_GROWTH", "pro": "STRIPE_PRICE_PRO"}
+        lines = [f"{env_names[plan]}={pid}" for plan, pid in prices.items()]
+        print("Price IDs (for .env.local):")
+        for line in lines:
+            print("   " + line)
         if args.write:
-            cfg = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-            cfg.setdefault("stripe", {})["prices"] = prices
-            CONFIG_FILE.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-            print("\n✓ Wrote price IDs into config.json → stripe.prices")
+            env_file = Path(__file__).parent.parent / ".env.local"
+            text = env_file.read_text(encoding="utf-8") if env_file.exists() else ""
+            for line in lines:
+                k = line.split("=", 1)[0]
+                if re.search(rf"(?m)^{k}=", text):
+                    text = re.sub(rf"(?m)^{k}=.*$", line, text)
+                else:
+                    text = (text.rstrip() + "\n" + line + "\n") if text else line + "\n"
+            env_file.write_text(text, encoding="utf-8")
+            print("\n✓ Wrote the price IDs into .env.local")
         else:
-            print("\nAdd these under config.json → stripe.prices "
-                  "(or re-run with --write to do it automatically).")
+            print("\nPaste those into .env.local (or re-run with --write).")
 
 
 if __name__ == "__main__":
