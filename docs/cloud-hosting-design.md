@@ -75,6 +75,14 @@ Gated by the RunPod benchmark. Build order:
 
 Phase A keeps state as JSON on a single instance on purpose. With render offloaded to RunPod, the web instance stays light, so this avoids the large Postgres migration while still delivering a fully working hosted product.
 
+## Phase A deploy checklist (do not skip — several are silent-failure traps)
+- [ ] **Env vars on Railway:** `FAL_KEY`, `YOUTUBE_CLIENT_ID`, `YOUTUBE_CLIENT_SECRET`, the `STRIPE_*` set, `APP_BASE_URL` (the custom domain), `AUTOPILOT_SCHEDULER=1` on the single instance. Rotating keys during the move is good hygiene.
+- [ ] **Register the production OAuth redirect URI** (`APP_BASE_URL` + `/oauth/callback`) in the Google Cloud console — local `localhost:5000` is unaffected, but prod OAuth fails until this is added.
+- [ ] **`stripe` in requirements** (done) — billing lazy-imports it, so a prod deploy without it has *silently* no billing.
+- [ ] **gunicorn start:** `gunicorn --workers 1 --timeout 120 wsgi:app` with the service working directory set to `dashboard/` (that's where `wsgi.py` resolves from). `--workers 1` is mandatory — JSON state + in-process locks are not multi-worker-safe. A file-lock in `wsgi.py` stops duplicate schedulers as defense-in-depth, but it does NOT make multi-worker safe for state.
+- [ ] **Preserve the `serve_file` ownership check** (app.py ~1772) when `/files/` switches to signed R2 URLs — issue the signed URL only after `user_owns_channel`, or media tenancy is bypassed by a shareable link.
+- [ ] **Cloudflare R2** account + bucket + API token before the storage-layer work can be tested.
+
 ## Phase B — scale (only when one web instance is not enough)
 1. Migrate `users.json`, `projects.json`, `channels.json`, `image_library_*.json` to Supabase Postgres.
 2. Replace in-process `threading.Lock` guards with the database.
