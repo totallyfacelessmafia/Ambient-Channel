@@ -16,6 +16,7 @@ Tokens are stored in dashboard/yt_token.json (auto-refreshed on use).
 """
 
 import json
+import os
 import re
 from pathlib import Path
 
@@ -34,7 +35,9 @@ SCOPES = [
     "https://www.googleapis.com/auth/youtube",
 ]
 
-REDIRECT_URI = "http://localhost:5000/oauth/callback"
+# Derive from APP_BASE_URL for hosted deploys; local dev keeps the old default.
+# The production redirect URI must also be registered in the Google Cloud console.
+REDIRECT_URI = os.environ.get("APP_BASE_URL", "http://localhost:5000").rstrip("/") + "/oauth/callback"
 
 
 # ---------------------------------------------------------------------------
@@ -52,8 +55,9 @@ def _get_client_config() -> dict | None:
     """Return the OAuth client_secrets dict, or None if not configured."""
     cfg     = _load_config()
     yt_oauth = cfg.get("youtube_oauth", {})
-    cid     = yt_oauth.get("client_id", "")
-    cse     = yt_oauth.get("client_secret", "")
+    # Env first (hosted), then local config.json — same precedence as FAL_KEY.
+    cid     = os.environ.get("YOUTUBE_CLIENT_ID") or yt_oauth.get("client_id", "")
+    cse     = os.environ.get("YOUTUBE_CLIENT_SECRET") or yt_oauth.get("client_secret", "")
     if not cid or not cse or cid.startswith("YOUR_"):
         return None
     return {
