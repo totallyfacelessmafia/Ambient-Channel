@@ -170,12 +170,16 @@ def handle_webhook(payload: bytes, sig_header: str) -> dict:
     if stripe is None or not secret:
         return {"ok": False, "error": "Billing webhook not configured."}
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, secret)
+        stripe.Webhook.construct_event(payload, sig_header, secret)  # verify signature
     except Exception as exc:  # noqa: BLE001 (bad signature / parse)
         return {"ok": False, "error": f"Signature verification failed: {exc}"}
 
-    etype = event["type"]
-    obj = event["data"]["object"]
+    # Parse the (now-trusted) payload as a plain dict — Stripe's StripeObject
+    # doesn't expose dict.get(), so work with raw JSON for safe access.
+    import json as _json
+    event = _json.loads(payload if isinstance(payload, str) else payload.decode("utf-8"))
+    etype = event.get("type", "")
+    obj = (event.get("data") or {}).get("object") or {}
 
     if etype == "checkout.session.completed":
         email = obj.get("client_reference_id") or obj.get("customer_email")
