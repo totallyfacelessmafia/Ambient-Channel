@@ -47,7 +47,8 @@ def _secret_key() -> str:
         envload.load_env()          # pick up .env / .env.local
     except Exception:
         pass
-    key = os.environ.get("STRIPE_SECRET_KEY", "")
+    # Prefer a test key so setup runs against the test account by default.
+    key = os.environ.get("STRIPE_TEST_SECRET_KEY") or os.environ.get("STRIPE_SECRET_KEY", "")
     if not key.startswith("sk_"):
         try:
             key = json.loads(CONFIG_FILE.read_text(encoding="utf-8")) \

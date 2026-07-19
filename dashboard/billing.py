@@ -39,10 +39,13 @@ def _config() -> dict:
     except (OSError, json.JSONDecodeError):
         j = {}
     jp = j.get("prices", {}) or {}
+    # A STRIPE_TEST_* value wins when present, so dev/staging runs in test mode
+    # while the live keys sit parked for launch. This also fails SAFE: a stray
+    # test key in prod means "no real charges", never the reverse.
     return {
-        "secret_key":      os.environ.get("STRIPE_SECRET_KEY") or j.get("secret_key", ""),
-        "webhook_secret":  os.environ.get("STRIPE_WEBHOOK_SECRET") or j.get("webhook_secret", ""),
-        "publishable_key": os.environ.get("STRIPE_PUBLISHABLE_KEY") or j.get("publishable_key", ""),
+        "secret_key":      os.environ.get("STRIPE_TEST_SECRET_KEY") or os.environ.get("STRIPE_SECRET_KEY") or j.get("secret_key", ""),
+        "webhook_secret":  os.environ.get("STRIPE_TEST_WEBHOOK_SECRET") or os.environ.get("STRIPE_WEBHOOK_SECRET") or j.get("webhook_secret", ""),
+        "publishable_key": os.environ.get("STRIPE_TEST_PUBLISHABLE_KEY") or os.environ.get("STRIPE_PUBLISHABLE_KEY") or j.get("publishable_key", ""),
         "prices": {
             "starter": os.environ.get("STRIPE_PRICE_STARTER") or jp.get("starter", ""),
             "growth":  os.environ.get("STRIPE_PRICE_GROWTH")  or jp.get("growth", ""),
